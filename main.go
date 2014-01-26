@@ -68,7 +68,7 @@ func download(file File) (fileSize int64, spendTime string, err error) {
 
 func progress(dest *os.File, fileData io.Reader, fileSize int64) (p float32) {
 	var read int64
-	buffer := make([]byte, 100000)
+	buffer := make([]byte, 1024)
 	for {
 		cBytes, _ := fileData.Read(buffer)
 		if cBytes == 0 {
