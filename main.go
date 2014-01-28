@@ -77,7 +77,9 @@ func progress(dest *os.File, fileData io.Reader, fileSize int64) (p float32) {
 		read = read + int64(cBytes)
 		p = float32(read) / float32(fileSize) * 100
 		fmt.Printf("progress: %v%% \n", int(p))
-		dest.Write(buffer)
+		if _, err := dest.Write(buffer[:cBytes]); err != nil {
+            panic(err)
+        }
 	}
 	return
 }
