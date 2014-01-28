@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+    "runtime"
 )
 
 type File struct {
@@ -84,29 +85,33 @@ func progress(dest *os.File, fileData io.Reader, fileSize int64) (p float32) {
 	return
 }
 
-func handleDownload(url string, ch chan int) {
+func handleDownload(key int, url string, ch chan int) {
 	file := file_default_parameter(url)
 	fileSize, spendTime, err := download(file)
 
 	if err == nil {
 		fmt.Printf("%s (%d bytes) has been download! Spend time : %s\n", file.name, fileSize, spendTime)
-		ch <- 1
+		ch <- -1
 	} else {
 		fmt.Println("  **Error :", err)
-		ch <- 0
+		ch <- key
 	}
 }
 
 func main() {
+    // Full CPU Running
+    runtime.GOMAXPROCS(runtime.NumCPU())
+
 	// Urls
 	urls := []string{
 		"https://calibre-ebook.googlecode.com/files/eight-demo.flv",
+        "http://www.hdflvplayer.net/hdflvplayer/hdplayer.swf",
 	}
 	ch := make(chan int, len(urls))
-	for _, url := range urls {
-		go handleDownload(url, ch)
+	for key, url := range urls {
+		go handleDownload(key, url, ch)
 	}
 	for i := 0; i < len(urls); i++ {
-		<-ch
+		fmt.Println(<-ch)
 	}
 }
