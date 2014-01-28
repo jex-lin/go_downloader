@@ -13,17 +13,23 @@ import (
     "runtime"
 )
 
+const (
+    tryCount = 3
+)
+
 type File struct {
 	url  string
 	name string
 	path string
+    tryCount int
 }
 
-func file_default_parameter(url string) (file File) {
+func file_default_data(url string) (file File) {
 	urlSplit := strings.Split(url, "/")
 	name := urlSplit[len(urlSplit)-1]
 	path := "/tmp/" + name
-	return File{url, name, path}
+    tryCount := tryCount
+	return File{url, name, path, tryCount}
 }
 
 func download(file File) (fileSize int64, spendTime string, err error) {
@@ -85,8 +91,7 @@ func progress(dest *os.File, fileData io.Reader, fileSize int64) (p float32) {
 	return
 }
 
-func handleDownload(key int, url string, ch chan int) {
-	file := file_default_parameter(url)
+func handleDownload(key int, file File, ch chan int) {
 	fileSize, spendTime, err := download(file)
 
 	if err == nil {
@@ -102,16 +107,31 @@ func main() {
     // Full CPU Running
     runtime.GOMAXPROCS(runtime.NumCPU())
 
+    var urlCount, failKey int
+    var files []File
+    var file File
+
 	// Urls
-	urls := []string{
-		"https://calibre-ebook.googlecode.com/files/eight-demo.flv",
+	urlList := []string {
+        "https://calibre-ebook.googlecode.com/files/eight-demo.flv",
         "http://www.hdflvplayer.net/hdflvplayer/hdplayer.swf",
 	}
-	ch := make(chan int, len(urls))
-	for key, url := range urls {
-		go handleDownload(key, url, ch)
+    urlCount = len(urlList)
+	ch := make(chan int, urlCount)
+	for key, url := range urlList {
+        file = file_default_data(url)
+        files = append(files, file)
+		go handleDownload(key, file, ch)
 	}
-	for i := 0; i < len(urls); i++ {
-		fmt.Println(<-ch)
+	for i := 0; i < urlCount; i++ {
+        failKey = <-ch
+        if failKey != -1 {
+            if files[failKey].tryCount <= 3 {
+                files[failKey].tryCount++
+                go handleDownload(failKey, files[failKey], ch)
+            } else {
+                fmt.Println("Fail to connect %s", files[failKey].name)
+            }
+        }
 	}
 }
