@@ -14,31 +14,34 @@ import (
 )
 
 const (
-    tryCount = 3
+    tryCountLimit = 5
 )
 
 type File struct {
 	url  string
 	name string
 	path string
-    tryCount int
+    retryCount int
+    connStatus bool
+    msg string
 }
 
 func file_default_data(url string) (file File) {
 	urlSplit := strings.Split(url, "/")
 	name := urlSplit[len(urlSplit)-1]
 	path := "/tmp/" + name
-    tryCount := tryCount
-	return File{url, name, path, tryCount}
+    retryCount := 0
+    connStatus := false
+    msg := ""
+	return File{url, name, path, retryCount, connStatus, msg}
 }
 
 func download(file File) (fileSize int64, spendTime string, err error) {
 	// Get data
-	resp, _err := http.Get(file.url)
-	if _err != nil {
-		log.Fatal(_err)
+	resp, err := http.Get(file.url)
+	if err != nil {
+		log.Fatal(err)
 	}
-	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		errMsg := fmt.Sprintf("server return non-200 status: %v", resp.Status)
 		err = errors.New(errMsg)
@@ -47,6 +50,7 @@ func download(file File) (fileSize int64, spendTime string, err error) {
 	i, _ := strconv.Atoi(resp.Header.Get("Content-Length"))
 	fileSize = int64(i)
 	var fileData io.Reader = resp.Body
+	defer resp.Body.Close()
 
 	// Create file
 	dest, err := os.Create(file.path)
@@ -59,7 +63,7 @@ func download(file File) (fileSize int64, spendTime string, err error) {
 
 	// Progress
 	startTime := time.Now()
-	p := progress(dest, fileData, fileSize)
+	p := progress(&file.name, dest, fileData, fileSize)
 	endTime := time.Now()
 
 	// Print result
@@ -73,7 +77,7 @@ func download(file File) (fileSize int64, spendTime string, err error) {
 	return fileSize, spendTime, err
 }
 
-func progress(dest *os.File, fileData io.Reader, fileSize int64) (p float32) {
+func progress(fileName *string, dest *os.File, fileData io.Reader, fileSize int64) (p float32) {
 	var read int64
 	buffer := make([]byte, 1024)
 	for {
@@ -83,23 +87,22 @@ func progress(dest *os.File, fileData io.Reader, fileSize int64) (p float32) {
 		}
 		read = read + int64(cBytes)
 		p = float32(read) / float32(fileSize) * 100
-		fmt.Printf("progress: %v%% \n", int(p))
-		if _, err := dest.Write(buffer[:cBytes]); err != nil {
-            panic(err)
-        }
+        //fmt.Printf("%s progress: %v%%\n", *fileName, int(p))
+		dest.Write(buffer[:cBytes])
 	}
 	return
 }
 
-func handleDownload(key int, file File, ch chan int) {
+func handleDownload(file File, chFile chan File) {
 	fileSize, spendTime, err := download(file)
-
 	if err == nil {
-		fmt.Printf("%s (%d bytes) has been download! Spend time : %s\n", file.name, fileSize, spendTime)
-		ch <- -1
+        file.msg = fmt.Sprintf("%s (%d bytes) has been download! Spend time : %s", file.name, fileSize, spendTime)
+        file.connStatus = true
+		chFile <- file
 	} else {
-		fmt.Println("  **Error :", err)
-		ch <- key
+        file.retryCount++
+        file.msg = fmt.Sprintf("  **Fail to connect %s %d time(s)", file.name, file.retryCount)
+		chFile <- file
 	}
 }
 
@@ -107,31 +110,34 @@ func main() {
     // Full CPU Running
     runtime.GOMAXPROCS(runtime.NumCPU())
 
-    var urlCount, failKey int
+    var chReturn File
     var files []File
     var file File
 
 	// Urls
 	urlList := []string {
-        "https://calibre-ebook.googlecode.com/files/eight-demo.flv",
+        //"https://calibre-ebook.googlecode.com/files/eight-demo.flv",
         "http://www.hdflvplayer.net/hdflvplayer/hdplayer.swf",
 	}
-    urlCount = len(urlList)
-	ch := make(chan int, urlCount)
-	for key, url := range urlList {
+	ch := make(chan File, len(urlList))
+	for _, url := range urlList {
         file = file_default_data(url)
         files = append(files, file)
-		go handleDownload(key, file, ch)
+		go handleDownload(file, ch)
 	}
-	for i := 0; i < urlCount; i++ {
-        failKey = <-ch
-        if failKey != -1 {
-            if files[failKey].tryCount <= 3 {
-                files[failKey].tryCount++
-                go handleDownload(failKey, files[failKey], ch)
+    chCount := len(urlList)
+	for i := 0; i < chCount; i++ {
+        chReturn = <-ch
+        if chReturn.connStatus == false {
+            if chReturn.retryCount <= tryCountLimit {
+                fmt.Println(chReturn.msg)
+                go handleDownload(chReturn, ch)
+                chCount++
             } else {
-                fmt.Println("Fail to connect %s", files[failKey].name)
+                fmt.Printf("  **Give up to connect %s\n", chReturn.name)
             }
+        } else {
+            fmt.Println(chReturn.msg)
         }
 	}
 }
