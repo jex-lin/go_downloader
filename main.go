@@ -4,60 +4,89 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"net"
 	"net/http"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
-    "runtime"
 )
 
-const (
-    tryCountLimit = 5
-)
+var tryCountLimit int = 5
+var httpTimeout time.Duration = 5 * time.Second
 
 type File struct {
-	url  string
-	name string
-	path string
-    retryCount int
-    connStatus bool
-    msg string
+	url        string
+	name       string
+	path       string
+	retryCount int
+	connStatus bool
+	msg        string
 }
 
-func file_default_data(url string) (file File) {
-	urlSplit := strings.Split(url, "/")
-	name := urlSplit[len(urlSplit)-1]
-	path := "/tmp/" + name
-    retryCount := 0
-    connStatus := false
-    msg := ""
-	return File{url, name, path, retryCount, connStatus, msg}
+var DefaultFile = File {
+	retryCount : 0,
+	connStatus : false,
+	msg : "",
 }
 
-func download(file File) (fileSize int64, spendTime string, err error) {
+type ConnReturn struct {
+    fileSize int64
+    spendTime string
+    err error
+}
+
+var DefaultConnReturn = ConnReturn {
+fileSize : 0,
+spendTime : "",
+err : nil,
+}
+
+func download(file File) (ConnReturn ConnReturn) {
+    ConnReturn = DefaultConnReturn
+
+    // Set timeout for http.get
+	client := http.Client{
+		Transport: &http.Transport{
+			Dial: func(netw, addr string) (net.Conn, error) {
+				deadline := time.Now().Add(httpTimeout)
+				c, err := net.DialTimeout(netw, addr, time.Second * 5)
+				if err != nil {
+					return nil, errors.New("Timeout")
+				}
+				c.SetDeadline(deadline)
+				return c, nil
+			},
+		},
+	}
+
 	// Get data
-	resp, err := http.Get(file.url)
+	resp, err := client.Get(file.url)
 	if err != nil {
-		log.Fatal(err)
+        ConnReturn.err = err
+		return ConnReturn
 	}
 	if resp.StatusCode != http.StatusOK {
 		errMsg := fmt.Sprintf("server return non-200 status: %v", resp.Status)
-		err = errors.New(errMsg)
-		return 0, "", err
+		ConnReturn.err = errors.New(errMsg)
+		return ConnReturn
 	}
-	i, _ := strconv.Atoi(resp.Header.Get("Content-Length"))
-	fileSize = int64(i)
-	var fileData io.Reader = resp.Body
+	i, err := strconv.Atoi(resp.Header.Get("Content-Length"))
+	if err != nil {
+        ConnReturn.err = err
+		return ConnReturn
+	}
 	defer resp.Body.Close()
+    fileSize := int64(i)
+	var fileData io.Reader = resp.Body
 
 	// Create file
 	dest, err := os.Create(file.path)
 	if err != nil {
 		errMsg := fmt.Sprintf("Can't create %s : %v", file.path, err)
-		err = errors.New(errMsg)
-		return 0, "", err
+		ConnReturn.err = errors.New(errMsg)
+		return ConnReturn
 	}
 	defer dest.Close()
 
@@ -70,11 +99,14 @@ func download(file File) (fileSize int64, spendTime string, err error) {
 	if p == 100 {
 		err = nil
 	} else {
-		err = errors.New("fail")
+        os.Remove(file.path)
+        err = errors.New("p isn't 100 percent")
 	}
 	subTime := endTime.Sub(startTime)
-	spendTime = subTime.String()
-	return fileSize, spendTime, err
+    ConnReturn.fileSize = fileSize
+    ConnReturn.spendTime = subTime.String()
+    ConnReturn.err = err
+	return ConnReturn
 }
 
 func progress(fileName *string, dest *os.File, fileData io.Reader, fileSize int64) (p float32) {
@@ -87,57 +119,64 @@ func progress(fileName *string, dest *os.File, fileData io.Reader, fileSize int6
 		}
 		read = read + int64(cBytes)
 		p = float32(read) / float32(fileSize) * 100
-        //fmt.Printf("%s progress: %v%%\n", *fileName, int(p))
+		//fmt.Printf("%s progress: %v%%\n", *fileName, int(p))
 		dest.Write(buffer[:cBytes])
 	}
 	return
 }
 
 func handleDownload(file File, chFile chan File) {
-	fileSize, spendTime, err := download(file)
-	if err == nil {
-        file.msg = fmt.Sprintf("%s (%d bytes) has been download! Spend time : %s", file.name, fileSize, spendTime)
-        file.connStatus = true
+	ConnReturn := download(file)
+	if ConnReturn.err == nil {
+		file.msg = fmt.Sprintf("%s (%d bytes) has been download! Spend time : %s", file.name, ConnReturn.fileSize, ConnReturn.spendTime)
+		file.connStatus = true
 		chFile <- file
 	} else {
-        file.retryCount++
-        file.msg = fmt.Sprintf("  **Fail to connect %s %d time(s)", file.name, file.retryCount)
+		file.retryCount++
+		file.msg = fmt.Sprintf("  **Fail to connect %s %d time(s).", file.name, file.retryCount)
 		chFile <- file
 	}
 }
 
 func main() {
-    // Full CPU Running
-    runtime.GOMAXPROCS(runtime.NumCPU())
+	// Full CPU Running
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
-    var chReturn File
-    var files []File
-    var file File
+	var chReturn File
+	var files []File
+	var file File
 
 	// Urls
-	urlList := []string {
-        //"https://calibre-ebook.googlecode.com/files/eight-demo.flv",
-        "http://www.hdflvplayer.net/hdflvplayer/hdplayer.swf",
+	urlList := []string{
+		"https://calibre-ebook.googlecode.com/files/eight-demo.flv",
+        "http://www.paulgu.com/w/images/f/f0/Honda_accord.flv",
+        "http://vault.futurama.sk/joomla/media/video/video2.flv",
+        "http://video.disclose.tv/12/69/demo_video_13_FLV_126943.flv",
 	}
 	ch := make(chan File, len(urlList))
 	for _, url := range urlList {
-        file = file_default_data(url)
-        files = append(files, file)
+        urlSplit := strings.Split(url, "/")
+        file = DefaultFile
+        file.url = url
+        file.name = urlSplit[len(urlSplit)-1]
+        file.path = "/tmp/" + file.name
+		files = append(files, file)
 		go handleDownload(file, ch)
 	}
-    chCount := len(urlList)
+	chCount := len(urlList)
 	for i := 0; i < chCount; i++ {
-        chReturn = <-ch
-        if chReturn.connStatus == false {
-            if chReturn.retryCount <= tryCountLimit {
-                fmt.Println(chReturn.msg)
-                go handleDownload(chReturn, ch)
-                chCount++
-            } else {
-                fmt.Printf("  **Give up to connect %s\n", chReturn.name)
-            }
-        } else {
-            fmt.Println(chReturn.msg)
-        }
+		chReturn = <-ch
+		if chReturn.connStatus == false {
+			if chReturn.retryCount < tryCountLimit {
+				fmt.Println(chReturn.msg)
+				go handleDownload(chReturn, ch)
+				chCount++
+			} else {
+				fmt.Println(chReturn.msg)
+				fmt.Printf("  **Give up to connect %s\n", chReturn.name)
+			}
+		} else {
+			fmt.Println(chReturn.msg)
+		}
 	}
 }
