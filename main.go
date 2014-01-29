@@ -3,6 +3,7 @@ package main
 import(
     "go_downloader/download"
     "net/http"
+    "html/template"
     "log"
 	"runtime"
     "strings"
@@ -55,16 +56,24 @@ func DownloadFiles() {
 	}
 }
 
-
-
 func sayhelloName(w http.ResponseWriter, r *http.Request) {
-    fmt.Fprintf(w, "qq");
+
+    t1, err := template.ParseFiles("view/template/header.tmpl", "view/body.html", "view/template/footer.tmpl")
+    if  err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+    }
+    t1.ExecuteTemplate(os.Stdout, "header", nil)
+    t1.ExecuteTemplate(os.Stdout, "body", nil)
+    t1.ExecuteTemplate(os.Stdout, "footer", nil)
+    if err := t1.Execute(os.Stdout, "dd"); err != nil {
+        fmt.Fprintf(w, "fff")
+    }
 	// Create file
-	dest, err := os.Create("C:\\Go\\mygo\\src\\go_downloader\\qq.txt")
-	if err != nil {
-		log.Fatal("create file error")
-	}
-	defer dest.Close()
+	//dest, err := os.Create("C:\\Go\\mygo\\src\\go_downloader\\qq.txt")
+	//if err != nil {
+	//	log.Fatal("create file error")
+	//}
+	//defer dest.Close()
 
     //r.ParseForm() //解析參數，默認是不會解析的
     //fmt.Println(r.Form) //這些信息是輸出到服務器端的打印信息
