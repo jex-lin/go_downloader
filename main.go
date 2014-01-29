@@ -1,0 +1,87 @@
+package main
+
+import(
+    "go_downloader/download"
+    "net/http"
+    "log"
+	"runtime"
+    "strings"
+    "fmt"
+    "os"
+)
+
+var tryCountLimit int = 5
+
+func DownloadFiles() {
+	// Full CPU Running
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
+	var chReturn download.File
+	var files []download.File
+	var file download.File
+
+	// Urls
+	urlList := []string{
+		//"https://calibre-ebook.googlecode.com/files/eight-demo.flv",
+        //"http://www.paulgu.com/w/images/f/f0/Honda_accord.flv",
+        //"http://vault.futurama.sk/joomla/media/video/video2.flv",
+        "http://video.disclose.tv/12/69/demo_video_13_FLV_126943.flv",
+	}
+	ch := make(chan download.File, len(urlList))
+	for _, url := range urlList {
+        urlSplit := strings.Split(url, "/")
+        file = download.DefaultFile
+        file.Url = url
+        file.Name = urlSplit[len(urlSplit)-1]
+        file.Path = "/tmp/" + file.Name
+		files = append(files, file)
+		go download.HandleDownload(file, ch)
+	}
+	chCount := len(urlList)
+	for i := 0; i < chCount; i++ {
+		chReturn = <-ch
+		if chReturn.ConnStatus == false {
+			if chReturn.RetryCount < tryCountLimit {
+				fmt.Println(chReturn.Msg)
+				go download.HandleDownload(chReturn, ch)
+				chCount++
+			} else {
+				fmt.Println(chReturn.Msg)
+				fmt.Printf("  **Give up to connect %s\n", chReturn.Name)
+			}
+		} else {
+			fmt.Println(chReturn.Msg)
+		}
+	}
+}
+
+
+
+func sayhelloName(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "qq");
+	// Create file
+	dest, err := os.Create("C:\\Go\\mygo\\src\\go_downloader\\qq.txt")
+	if err != nil {
+		log.Fatal("create file error")
+	}
+	defer dest.Close()
+
+    //r.ParseForm() //解析參數，默認是不會解析的
+    //fmt.Println(r.Form) //這些信息是輸出到服務器端的打印信息
+    //fmt.Println("path", r.URL.Path)
+    //fmt.Println("scheme", r.URL.Scheme)
+    //fmt.Println(r.Form["url_long"])
+    //for k, v := range r.Form {
+    //    fmt.Println("key:", k)
+    //    fmt.Println("val:", strings.Join(v, ""))
+    //}
+    //fmt.Fprintf(w, "Hello astaxie!") //這個寫入到w的是輸出到客戶端的
+}
+
+func main() {
+    http.HandleFunc("/", sayhelloName) //設置訪問的路由
+    err := http.ListenAndServe(":9090", nil) //設置監聽的端口
+    if err != nil {
+        log.Fatal("ListenAndServe: ", err)
+    }
+}
