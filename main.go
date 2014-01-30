@@ -2,11 +2,12 @@ package main
 
 import (
 	"go_downloader/source/download"
+	"go_downloader/source/web"
 	"log"
 	"net/http"
 	"html/template"
-    "runtime"
     "fmt"
+    "os"
 )
 
 // Static file (img, js, css)
@@ -58,8 +59,16 @@ func main() {
 }
 
 func osHandler(w http.ResponseWriter, r *http.Request) {
-    // ubuntu: linux, windows: , Mac OS: 
-    fmt.Fprintf(w, runtime.GOOS)
+    if web.IsDir(web.DesktopPath) {
+        fmt.Fprintf(w, "exist")
+        web.StoragePath = web.DesktopPath + "/thisav"
+        if err := os.Mkdir(web.StoragePath, 0775); err != nil {
+            fmt.Fprintf(w, "fail")
+        }
+    } else {
+        fmt.Fprintf(w, "no exist")
+    }
+
 
 	// Urls
 	urlList := []string{
@@ -69,7 +78,7 @@ func osHandler(w http.ResponseWriter, r *http.Request) {
 		//"http://video.disclose.tv/12/69/demo_video_13_FLV_126943.flv",
 	}
     if err := download.DownloadFiles(urlList); err != nil {
-        fmt.Fprintf(w, err.Error())
+        //fmt.Fprintf(w, err.Error())
     }
 }
 
