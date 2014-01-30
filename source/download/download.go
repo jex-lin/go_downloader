@@ -9,9 +9,14 @@ import (
 	"os"
 	"strconv"
 	"time"
+    "runtime"
+    "strings"
 )
 
-const httpTimeout time.Duration = 5 * time.Second
+const (
+    httpTimeout time.Duration = 5 * time.Second
+    tryCountLimit int = 5
+)
 
 type File struct {
 	Url        string
@@ -133,4 +138,46 @@ func HandleDownload(file File, chFile chan File) {
 		file.Msg = fmt.Sprintf("  **Fail to connect %s %d time(s).", file.Name, file.RetryCount)
 		chFile <- file
 	}
+}
+
+func DownloadFiles(urlList []string) (err error){
+    if len(urlList) == 0 {
+        err = errors.New("Url doesn't exsit!")
+        return err
+    }
+
+	// Full CPU Running
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
+	var chReturn File
+	var files []File
+	var file File
+
+	ch := make(chan File, len(urlList))
+	for _, url := range urlList {
+		urlSplit := strings.Split(url, "/")
+		file = DefaultFile
+		file.Url = url
+		file.Name = urlSplit[len(urlSplit)-1]
+		file.Path = "/tmp/" + file.Name
+		files = append(files, file)
+		go HandleDownload(file, ch)
+	}
+	chCount := len(urlList)
+	for i := 0; i < chCount; i++ {
+		chReturn = <-ch
+		if chReturn.ConnStatus == false {
+			if chReturn.RetryCount < tryCountLimit {
+				fmt.Println(chReturn.Msg)
+				go HandleDownload(chReturn, ch)
+				chCount++
+			} else {
+				fmt.Println(chReturn.Msg)
+				fmt.Printf("  **Give up to connect %s\n", chReturn.Name)
+			}
+		} else {
+			fmt.Println(chReturn.Msg)
+		}
+	}
+    return
 }
