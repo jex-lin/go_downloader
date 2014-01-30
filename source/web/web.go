@@ -2,11 +2,10 @@ package web
 
 import(
     "os"
+    "errors"
 )
 
-var HomePath string = os.Getenv("HOME")
-var DesktopPath string = HomePath + "/Desktop"
-var StoragePath string
+var storagePath string
 
 func IsDir(path string) bool {
     if res, err := os.Stat(path); err != nil {
@@ -17,9 +16,16 @@ func IsDir(path string) bool {
     return false
 }
 
-func SetDesktopPath(path string) bool {
+func GetStoragePath() (string, error) {
+    if IsDir(storagePath) {
+        return storagePath, nil
+    }
+    return "", errors.New("Directory doesn't exist")
+}
+
+func SetStoragePath(path string) bool {
     if (IsDir(path)) {
-        DesktopPath = path
+        storagePath = path
         return true
     }
     return false

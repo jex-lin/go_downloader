@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"html/template"
     "fmt"
-    "os"
 )
 
 // Static file (img, js, css)
@@ -59,14 +58,16 @@ func main() {
 }
 
 func osHandler(w http.ResponseWriter, r *http.Request) {
-    if web.IsDir(web.DesktopPath) {
-        fmt.Fprintf(w, "exist")
-        web.StoragePath = web.DesktopPath + "/thisav"
-        if err := os.Mkdir(web.StoragePath, 0775); err != nil {
-            fmt.Fprintf(w, "fail")
-        }
+    if web.SetStoragePath("/Users/apple/Desktop/ttt") {
+        fmt.Fprintf(w, "Exist")
     } else {
-        fmt.Fprintf(w, "no exist")
+        fmt.Fprintf(w, "Doesn't exist")
+    }
+    path, err := web.GetStoragePath()
+    if err == nil {
+        fmt.Fprintf(w, "    " + path)
+    } else {
+        fmt.Fprintf(w, "    " + err.Error())
     }
 
 
