@@ -1,7 +1,7 @@
 package main
 
 import(
-    "go_downloader/download"
+    "go_downloader/source/download"
     "net/http"
     "html/template"
     "log"
@@ -58,14 +58,15 @@ func DownloadFiles() {
 
 func sayhelloName(w http.ResponseWriter, r *http.Request) {
 
-    t1, err := template.ParseFiles("view/template/header.tmpl", "view/body.html", "view/template/footer.tmpl")
+    t1, err := template.ParseFiles("view/template/header.tmpl", "view/html/body.html", "view/template/footer.tmpl")
     if  err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
     }
     t1.ExecuteTemplate(os.Stdout, "header", nil)
     t1.ExecuteTemplate(os.Stdout, "body", nil)
     t1.ExecuteTemplate(os.Stdout, "footer", nil)
-    if err := t1.Execute(os.Stdout, "dd"); err != nil {
+    err = t1.Execute(os.Stdout, "dd")
+    if err != nil {
         fmt.Fprintf(w, "fff")
     }
 	// Create file
@@ -87,9 +88,20 @@ func sayhelloName(w http.ResponseWriter, r *http.Request) {
     //fmt.Fprintf(w, "Hello astaxie!") //這個寫入到w的是輸出到客戶端的
 }
 
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "<html><head></head><body><h1>Welcome Home!</h1><a href=\"/static/img/go.png\">Show Image!</a></body></html>")
+}
+
+func staticHandler(w http.ResponseWriter, r *http.Request) {
+    http.ServeFile(w, r, r.URL.Path[1:])
+}
+
+
 func main() {
-    http.HandleFunc("/", sayhelloName) //設置訪問的路由
-    err := http.ListenAndServe(":9090", nil) //設置監聽的端口
+    http.HandleFunc("/", homeHandler)
+    http.HandleFunc("/static/", staticHandler)
+    http.HandleFunc("/admin/", adminHandler)
+    err := http.ListenAndServe(":9090", nil)
     if err != nil {
         log.Fatal("ListenAndServe: ", err)
     }
