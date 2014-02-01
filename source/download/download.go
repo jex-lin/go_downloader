@@ -159,7 +159,7 @@ func DownloadFiles(urlList []string, storagePath string) (err error){
 		file = DefaultFile
 		file.Url = url
 		file.Name = urlSplit[len(urlSplit)-1]
-		file.Path = storagePath + file.Name
+		file.Path = storagePath + string(os.PathSeparator) +file.Name
 		files = append(files, file)
 		go HandleDownload(file, ch)
 	}
