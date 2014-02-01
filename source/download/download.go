@@ -101,7 +101,6 @@ func Download(file File) (ConnReturn ConnReturn) {
 	if p == 100 {
 		err = nil
 	} else {
-		os.Remove(file.Path)
 		err = errors.New("p isn't 100 percent")
 	}
 	subTime := endTime.Sub(startTime)
@@ -173,6 +172,7 @@ func DownloadFiles(urlList []string, storagePath string) (err error){
 				chCount++
 			} else {
 				fmt.Println(chReturn.Msg)
+				os.Remove(file.Path)
 				err = errors.New(fmt.Sprintf("  **Give up to connect %s\n", chReturn.Name))
 			}
 		} else {
