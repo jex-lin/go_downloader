@@ -4,6 +4,8 @@ import (
     "html/template"
     "net/http"
     "strings"
+    "fmt"
+    "path/filepath"
 )
 
 // Static file (img, js, css)
@@ -19,6 +21,8 @@ func Home(w http.ResponseWriter, r *http.Request) {
     r.ParseForm()
     if r.Method == "POST" {
         storagePath := strings.TrimSpace(r.FormValue("storagePath"))
+        storagePath = filepath.Clean(storagePath)
+        fmt.Println(storagePath)
         data["storagePath"] = storagePath
         if SetStoragePath(storagePath) {
             data["checkPathMsg"] = true

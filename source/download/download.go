@@ -121,7 +121,7 @@ func Progress(fileName *string, dest *os.File, fileData io.Reader, fileSize int6
 		}
 		read = read + int64(cBytes)
 		p = float32(read) / float32(fileSize) * 100
-		fmt.Printf("%s progress: %v%%\n", *fileName, int(p))
+		//fmt.Printf("%s progress: %v%%\n", *fileName, int(p))
 		dest.Write(buffer[:cBytes])
 	}
 	return
@@ -140,7 +140,7 @@ func HandleDownload(file File, chFile chan File) {
 	}
 }
 
-func DownloadFiles(urlList []string) (err error){
+func DownloadFiles(urlList []string, storagePath string) (err error){
     if len(urlList) == 0 {
         err = errors.New("Url doesn't exsit!")
         return err
@@ -159,7 +159,7 @@ func DownloadFiles(urlList []string) (err error){
 		file = DefaultFile
 		file.Url = url
 		file.Name = urlSplit[len(urlSplit)-1]
-		file.Path = "/tmp/" + file.Name
+		file.Path = storagePath + file.Name
 		files = append(files, file)
 		go HandleDownload(file, ch)
 	}
@@ -168,15 +168,15 @@ func DownloadFiles(urlList []string) (err error){
 		chReturn = <-ch
 		if chReturn.ConnStatus == false {
 			if chReturn.RetryCount < tryCountLimit {
-				//fmt.Println(chReturn.Msg)
+				fmt.Println(chReturn.Msg)
 				go HandleDownload(chReturn, ch)
 				chCount++
 			} else {
-				//fmt.Println(chReturn.Msg)
+				fmt.Println(chReturn.Msg)
 				err = errors.New(fmt.Sprintf("  **Give up to connect %s\n", chReturn.Name))
 			}
 		} else {
-			//fmt.Println(chReturn.Msg)
+			fmt.Println(chReturn.Msg)
 		}
 	}
     return

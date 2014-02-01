@@ -10,8 +10,16 @@ import(
 
 func Api(w http.ResponseWriter, r *http.Request) {
 
-output := map[string] interface{} {}
+    output := map[string] interface{} {}
 
+    storagePath, err := GetStoragePath()
+    if err != nil {
+        output["status"] = "fail"
+        output["errMsg"] = err.Error()
+        outputJson, _ := json.Marshal(output);
+        fmt.Fprintf(w, string(outputJson))
+        return
+    }
     // Receive post
     r.ParseForm()
     if r.Method == "POST" {
@@ -19,7 +27,7 @@ output := map[string] interface{} {}
         urlList := []string {
             url1,
         }
-        err := download.DownloadFiles(urlList);
+        err := download.DownloadFiles(urlList, storagePath);
         if  err != nil {
             output["status"] = "fail"
             output["errMsg"] = err.Error()
