@@ -1,4 +1,4 @@
-package os
+package web
 
 import (
     "os"
@@ -28,3 +28,6 @@ func SetStoragePath(path string) bool {
     }
     return false
 }
+
+
+

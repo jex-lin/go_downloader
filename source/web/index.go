@@ -4,7 +4,6 @@ import (
     "html/template"
     "net/http"
     "strings"
-    "go_downloader/source/os"
 )
 
 // Static file (img, js, css)
@@ -21,7 +20,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
     if r.Method == "POST" {
         storagePath := strings.TrimSpace(r.FormValue("storagePath"))
         data["storagePath"] = storagePath
-        if os.SetStoragePath(storagePath) {
+        if SetStoragePath(storagePath) {
             data["checkPathMsg"] = true
         } else {
             data["checkPathMsg"] = false

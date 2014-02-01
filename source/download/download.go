@@ -121,7 +121,7 @@ func Progress(fileName *string, dest *os.File, fileData io.Reader, fileSize int6
 		}
 		read = read + int64(cBytes)
 		p = float32(read) / float32(fileSize) * 100
-		//fmt.Printf("%s progress: %v%%\n", *fileName, int(p))
+		fmt.Printf("%s progress: %v%%\n", *fileName, int(p))
 		dest.Write(buffer[:cBytes])
 	}
 	return
@@ -168,15 +168,15 @@ func DownloadFiles(urlList []string) (err error){
 		chReturn = <-ch
 		if chReturn.ConnStatus == false {
 			if chReturn.RetryCount < tryCountLimit {
-				fmt.Println(chReturn.Msg)
+				//fmt.Println(chReturn.Msg)
 				go HandleDownload(chReturn, ch)
 				chCount++
 			} else {
-				fmt.Println(chReturn.Msg)
-				fmt.Printf("  **Give up to connect %s\n", chReturn.Name)
+				//fmt.Println(chReturn.Msg)
+				err = errors.New(fmt.Sprintf("  **Give up to connect %s\n", chReturn.Name))
 			}
 		} else {
-			fmt.Println(chReturn.Msg)
+			//fmt.Println(chReturn.Msg)
 		}
 	}
     return
