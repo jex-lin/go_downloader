@@ -1,18 +1,16 @@
-package web
+package os
 
-import(
+import (
     "os"
     "errors"
 )
 
 var storagePath string
 
-func IsDir(path string) bool {
-    if res, err := os.Stat(path); err != nil {
-        return os.IsExist(err)
-    } else {
-        return res.IsDir()
-    }
+func IsDir(path string) (bool) {
+    _, err := os.Stat(path)
+    if err == nil { return true }
+    if os.IsNotExist(err) { return false }
     return false
 }
 
@@ -30,5 +28,3 @@ func SetStoragePath(path string) bool {
     }
     return false
 }
-
-

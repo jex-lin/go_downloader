@@ -1,7 +1,76 @@
 {{define "body"}}
 {{template "header"}}
-<h1 id="go">Golang Web Works!</h1>
-<img src="/static/img/go.png"/>
-<div>{{.content}}</div>
+<div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="#">Project name</a>
+    </div>
+    <div class="collapse navbar-collapse">
+      <ul class="nav navbar-nav">
+        <li class="active"><a href="#">Home</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="starter-template">
+    <h1>Bootstrap starter template</h1>
+    <p class="lead">Use this document as a way to quickly start any new project.<br> All you get is this text and a mostly barebones HTML document.</p>
+    {{ if .storagePath}}
+        {{if .checkPathMsg }}
+            <div class="panel panel-success">
+                <div class="panel-heading">
+                    <h3 class="panel-title"><strong>"{{.storagePath}}"</strong> exists!</h3>
+                </div>
+            </div>
+        {{else}}
+            <div class="panel panel-danger">
+                <div class="panel-heading">
+                    <h3 class="panel-title"><strong>"{{.storagePath}}"</strong> doesn't exist!</h3>
+                </div>
+            </div>
+        {{end}}
+    {{end}}
+    <form method="POST">
+        <div class="row">
+          <div class="col-lg-6">
+            <div class="input-group">
+              <span class="input-group-addon glyphicon glyphicon-folder-open"></span>
+              <input type="text" class="form-control" name="storagePath" value="{{.storagePath}}" placeholder="Please select a folder that has exist to saving files that you download.">
+              <span class="input-group-btn">
+                  <button class="btn btn-default" type="submit">Go!</button>
+              </span>
+            </div><!-- /input-group -->
+          </div><!-- /.col-lg-6 -->
+    {{if .checkPathMsg }}
+          <div class="col-lg-6">
+            <div class="input-group">
+              <span class="input-group-addon glyphicon glyphicon-globe"></span>
+              <input type="text" class="form-control" name="fileUrl" placeholder="URL">
+              <span class="input-group-btn">
+                  <button class="btn btn-default" type="button">Download</button>
+              </span>
+            </div><!-- /input-group -->
+    {{end}}
+          </div><!-- /.col-lg-6 -->
+        </div><!-- /.row -->
+    </form>
+
+  </div>
+
+</div><!-- /.container -->
+
+
+
 {{template "footer"}}
 {{end}}
