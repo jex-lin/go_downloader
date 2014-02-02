@@ -1,4 +1,5 @@
 $(document).ready(function(){
+    ConnectWebsocket();
     $("#url1").change(function() {
         $("#dow1").removeAttr("disabled");
         $("#dow1").removeClass("btn-danger btn-success").addClass("btn-default");
@@ -29,3 +30,27 @@ $(document).ready(function(){
         })
     })
 })
+
+function ConnectWebsocket() {
+    ws = new WebSocket("ws://192.168.1.67:9090/echo/");
+
+    // First connect
+    ws.onopen = function() {
+        console.log("[onopen] connect ws uri.");
+    }
+
+    // Sending from server
+    ws.onmessage = function(e) {
+        console.log("[onmessage] message received: " + e.data);
+    }
+
+    // Server close connection
+    ws.onclose = function(e) {
+        console.log("[onclose] connection closed (" + e.code + ")");
+    }
+
+    // Occur error
+    ws.onerror = function (e) {
+        console.log("[onerror] error!");
+    }
+}
