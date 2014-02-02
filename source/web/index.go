@@ -43,7 +43,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
 	t.Execute(w, nil)
 }
 
-func Echo(ws *websocket.Conn) {
+func RespondProgress(ws *websocket.Conn) {
     var err error
 
     for {

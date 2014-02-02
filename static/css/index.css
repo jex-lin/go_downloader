@@ -1,7 +1,19 @@
+/* Copy example, solve head margin */
 body {
   padding-top: 50px;
 }
 .starter-template {
   padding: 40px 15px;
  text-align: center;
+}
+
+/* Override bootstrap source */
+.progress {
+    margin-bottom: 0px;
+}
+
+
+/* index */
+#url1-progress {
+    display: none;
 }

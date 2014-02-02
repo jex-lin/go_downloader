@@ -23,9 +23,9 @@ func Api(w http.ResponseWriter, r *http.Request) {
     // Receive post
     r.ParseForm()
     if r.Method == "POST" {
-        url1 := strings.TrimSpace(r.FormValue("url1"))
+        url := strings.TrimSpace(r.FormValue("url"))
         urlList := []string {
-            url1,
+            url,
         }
         err := download.DownloadFiles(urlList, storagePath);
         if  err != nil {

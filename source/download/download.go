@@ -7,15 +7,15 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"runtime"
 	"strconv"
+	"strings"
 	"time"
-    "runtime"
-    "strings"
 )
 
 const (
-    httpTimeout time.Duration = 5 * time.Second
-    tryCountLimit int = 5
+	httpTimeout   time.Duration = 60 * time.Second
+	tryCountLimit int           = 5
 )
 
 type File struct {
@@ -94,15 +94,10 @@ func Download(file File) (ConnReturn ConnReturn) {
 
 	// Progress
 	startTime := time.Now()
-	p := Progress(&file.Name, dest, fileData, fileSize)
+	_, err = Progress(&file.Name, dest, fileData, fileSize)
 	endTime := time.Now()
 
 	// Print result
-	if p == 100 {
-		err = nil
-	} else {
-		err = errors.New("p isn't 100 percent")
-	}
 	subTime := endTime.Sub(startTime)
 	ConnReturn.FileSize = fileSize
 	ConnReturn.SpendTime = subTime.String()
@@ -110,20 +105,36 @@ func Download(file File) (ConnReturn ConnReturn) {
 	return ConnReturn
 }
 
-func Progress(fileName *string, dest *os.File, fileData io.Reader, fileSize int64) (p float32) {
-	var read int64
-	buffer := make([]byte, 1448)
+func Progress(fileName *string, dest *os.File, fileData io.Reader, fileSize int64) (written int64, err error) {
+	var p float32
+	buf := make([]byte, 32*1024)
+
 	for {
-		cBytes, _ := fileData.Read(buffer)
-		if cBytes == 0 {
+		nr, er := fileData.Read(buf)
+		if nr > 0 {
+			nw, ew := dest.Write(buf[0:nr])
+			if nw > 0 {
+				written += int64(nw)
+			}
+			p = float32(written) / float32(fileSize) * 100
+			fmt.Printf("%s progress: %v%%\n", *fileName, int(p))
+			if ew != nil {
+				err = ew
+			}
+			if nr != nw {
+				err = errors.New("short write")
+			}
+		}
+		if er != nil {
+            if er.Error() == "EOF" {
+                // Sucessfully finish downloading
+                return written, nil
+            }
+			err = er
 			break
 		}
-		read = read + int64(cBytes)
-		p = float32(read) / float32(fileSize) * 100
-		//fmt.Printf("%s progress: %v%%\n", *fileName, int(p))
-		dest.Write(buffer[:cBytes])
 	}
-	return
+	return written, err
 }
 
 func HandleDownload(file File, chFile chan File) {
@@ -139,11 +150,11 @@ func HandleDownload(file File, chFile chan File) {
 	}
 }
 
-func DownloadFiles(urlList []string, storagePath string) (err error){
-    if len(urlList) == 0 {
-        err = errors.New("Url doesn't exsit!")
-        return err
-    }
+func DownloadFiles(urlList []string, storagePath string) (err error) {
+	if len(urlList) == 0 {
+		err = errors.New("Url doesn't exsit!")
+		return err
+	}
 
 	// Full CPU Running
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -158,7 +169,7 @@ func DownloadFiles(urlList []string, storagePath string) (err error){
 		file = DefaultFile
 		file.Url = url
 		file.Name = urlSplit[len(urlSplit)-1]
-		file.Path = storagePath + string(os.PathSeparator) +file.Name
+		file.Path = storagePath + string(os.PathSeparator) + file.Name
 		files = append(files, file)
 		go HandleDownload(file, ch)
 	}
@@ -179,5 +190,5 @@ func DownloadFiles(urlList []string, storagePath string) (err error){
 			fmt.Println(chReturn.Msg)
 		}
 	}
-    return
+	return
 }
