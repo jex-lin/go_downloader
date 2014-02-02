@@ -44,7 +44,7 @@
         <div class="row">
           <div class="col-lg-6">
             <div class="input-group">
-              <span class="input-group-addon glyphicon glyphicon-folder-open"></span>
+              <span class="input-group-addon "><span class="glyphicon glyphicon-folder-open"></span></span>
               <input type="text" class="form-control" name="storagePath" value="{{.storagePath}}" placeholder="Please select a folder that has exist to saving files that you download.">
               <span class="input-group-btn">
                   <button class="btn btn-primary" type="submit">Check</button>
@@ -53,15 +53,25 @@
           </div><!-- /.col-lg-6 -->
     {{if .checkPathMsg }}
           <div class="col-lg-6">
-            <div class="input-group">
-              <span class="input-group-addon glyphicon glyphicon-globe"></span>
-              <input type="text" class="form-control" name="url1" id="url1" placeholder="URL">
-              <span class="input-group-btn">
-                  <button class="btn btn-default" type="button" id="dow1">Download</button>
-              </span>
-            </div><!-- /input-group -->
+            <ul class="list-group">
+                <li class="list-group-item list-group-item-success">
+                    <div class="input-group">
+                      <span class="input-group-addon"><span class="glyphicon glyphicon-globe"></span></span>
+                      <input type="text" class="form-control" name="url1" id="url1" placeholder="URL">
+                      <span class="input-group-btn">
+                          <button class="btn btn-default" type="button" id="dow1">Download</button>
+                      </span>
+                  </div>
+                </li>
+                <li class="list-group-item list-group-item-info">Cras sit amet nibh libero</li>
+                <li class="list-group-item list-group-item-warning">Porta ac consectetur ac</li>
+                <li class="list-group-item list-group-item-danger">Vestibulum at eros</li>
+            </ul>
           </div><!-- /.col-lg-6 -->
     {{end}}
+        
+        <div class="col-lg-6">
+        </div>
         </div><!-- /.row -->
     </form>
   </div>
