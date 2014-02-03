@@ -4,18 +4,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"os"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
+    "go_downloader/model/osmod"
 )
 
 const (
-	httpTimeout   time.Duration = 60 * time.Second
-	tryCountLimit int           = 5
+	tryCountLimit int           = 3
 )
 
 type File struct {
@@ -41,30 +40,15 @@ type ConnReturn struct {
 
 var DefaultConnReturn = ConnReturn{
 	FileSize:  0,
-	SpendTime: "",
+	SpendTime: "0s",
 	Err:       nil,
 }
 
 func Download(file File) (ConnReturn ConnReturn) {
 	ConnReturn = DefaultConnReturn
 
-	// Set timeout for http.get
-	client := http.Client{
-		Transport: &http.Transport{
-			Dial: func(netw, addr string) (net.Conn, error) {
-				deadline := time.Now().Add(httpTimeout)
-				c, err := net.DialTimeout(netw, addr, time.Second*5)
-				if err != nil {
-					return nil, errors.New("Timeout")
-				}
-				c.SetDeadline(deadline)
-				return c, nil
-			},
-		},
-	}
-
 	// Get data
-	resp, err := client.Get(file.Url)
+	resp, err := http.Get(file.Url)
 	if err != nil {
 		ConnReturn.Err = err
 		return ConnReturn
@@ -81,6 +65,16 @@ func Download(file File) (ConnReturn ConnReturn) {
 		return ConnReturn
 	}
 	fileSize := int64(i)
+
+    // If file already had been downloaded, don't do it again.
+    isExistent, fileInfo := osmod.GetFileInfo(file.Path)
+    if isExistent {
+        if fileSize == fileInfo.Size() {
+            ConnReturn.FileSize = fileSize
+            return ConnReturn
+        }
+    }
+
 	var fileData io.Reader = resp.Body
 
 	// Create file
@@ -148,6 +142,41 @@ func HandleDownload(file File, chFile chan File) {
 		file.Msg = fmt.Sprintf("  **Fail to connect %s %d time(s).", file.Name, file.RetryCount)
 		chFile <- file
 	}
+}
+
+func DownloadFile(url string, storagePath string) (err error) {
+    if len(url) == 0 {
+		err = errors.New("Url doesn't exsit!")
+        return err
+    }
+
+	// Full CPU Running
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
+	var chReturn File
+	var file File
+	ch := make(chan File)
+
+    urlSplit := strings.Split(url, "/")
+    file = DefaultFile
+    file.Url = url
+    file.Name = urlSplit[len(urlSplit)-1]
+    file.Path = storagePath + string(os.PathSeparator) + file.Name
+    go HandleDownload(file, ch)
+    chReturn = <-ch
+    if chReturn.ConnStatus == false {
+        if chReturn.RetryCount < tryCountLimit {
+            fmt.Println(chReturn.Msg)
+            go HandleDownload(chReturn, ch)
+        } else {
+            fmt.Println(chReturn.Msg)
+            os.Remove(file.Path)
+            err = errors.New(fmt.Sprintf("  **Give up to connect %s\n", chReturn.Name))
+        }
+    } else {
+        fmt.Println(chReturn.Msg)
+    }
+    return
 }
 
 func DownloadFiles(urlList []string, storagePath string) (err error) {

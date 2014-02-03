@@ -1,4 +1,4 @@
-package web
+package index
 
 import (
     "html/template"
@@ -7,6 +7,7 @@ import (
     "path/filepath"
     "code.google.com/p/go.net/websocket"
     "fmt"
+    "go_downloader/model/osmod"
 )
 
 // Static file (img, js, css)
@@ -24,7 +25,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
         storagePath := strings.TrimSpace(r.FormValue("storagePath"))
         storagePath = filepath.Clean(storagePath)
         data["storagePath"] = storagePath
-        if SetStoragePath(storagePath) {
+        if osmod.SetStoragePath(storagePath) {
             data["checkPathMsg"] = true
         } else {
             data["checkPathMsg"] = false

@@ -1,18 +1,19 @@
-package web
+package api
 
 import(
     "fmt"
     "net/http"
     "strings"
-    "go_downloader/source/download"
+    "go_downloader/library/download"
     "encoding/json"
+    "go_downloader/model/osmod"
 )
 
 func Api(w http.ResponseWriter, r *http.Request) {
 
     output := map[string] interface{} {}
 
-    storagePath, err := GetStoragePath()
+    storagePath, err := osmod.GetStoragePath()
     if err != nil {
         output["status"] = "fail"
         output["errMsg"] = err.Error()
@@ -24,10 +25,7 @@ func Api(w http.ResponseWriter, r *http.Request) {
     r.ParseForm()
     if r.Method == "POST" {
         url := strings.TrimSpace(r.FormValue("url"))
-        urlList := []string {
-            url,
-        }
-        err := download.DownloadFiles(urlList, storagePath);
+        err := download.DownloadFile(url, storagePath);
         if  err != nil {
             output["status"] = "fail"
             output["errMsg"] = err.Error()
