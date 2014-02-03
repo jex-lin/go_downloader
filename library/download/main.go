@@ -11,19 +11,31 @@ import (
 	"strings"
 	"time"
     "go_downloader/model/osmod"
+    "code.google.com/p/go.net/websocket"
 )
 
 const (
-	tryCountLimit int           = 3
+	tryCountLimit int           = 1
 )
+
+type UrlData struct {
+    Target string
+    Url string
+    Progress int
+    Status string
+    ErrMsg string
+}
 
 type File struct {
 	Url        string
 	Name       string
+    Size       int64
 	Path       string
 	RetryCount int
 	ConnStatus bool
 	Msg        string
+    Ws         *websocket.Conn
+    UrlData    *UrlData
 }
 
 var DefaultFile = File{
@@ -64,7 +76,8 @@ func Download(file File) (ConnReturn ConnReturn) {
 		ConnReturn.Err = err
 		return ConnReturn
 	}
-	fileSize := int64(i)
+    fileSize := int64(i)
+	file.Size = fileSize
 
     // If file already had been downloaded, don't do it again.
     isExistent, fileInfo := osmod.GetFileInfo(file.Path)
@@ -88,7 +101,7 @@ func Download(file File) (ConnReturn ConnReturn) {
 
 	// Progress
 	startTime := time.Now()
-	_, err = Progress(&file.Name, dest, fileData, fileSize)
+	_, err = Progress(&file, dest, fileData)
 	endTime := time.Now()
 
 	// Print result
@@ -99,9 +112,11 @@ func Download(file File) (ConnReturn ConnReturn) {
 	return ConnReturn
 }
 
-func Progress(fileName *string, dest *os.File, fileData io.Reader, fileSize int64) (written int64, err error) {
+func Progress(file *File, dest *os.File, fileData io.Reader) (written int64, err error) {
 	var p float32
 	buf := make([]byte, 32*1024)
+
+    file.UrlData.Status = "keep"
 
 	for {
 		nr, er := fileData.Read(buf)
@@ -110,8 +125,12 @@ func Progress(fileName *string, dest *os.File, fileData io.Reader, fileSize int6
 			if nw > 0 {
 				written += int64(nw)
 			}
-			p = float32(written) / float32(fileSize) * 100
-			fmt.Printf("%s progress: %v%%\n", *fileName, int(p))
+			p = float32(written) / float32(file.Size) * 100
+			//fmt.Printf("%s progress: %v%%\n", file.Name, int(p))
+
+            file.UrlData.Progress = int(p)
+            websocket.JSON.Send(file.Ws, file.UrlData)
+
 			if ew != nil {
 				err = ew
 			}
@@ -144,7 +163,7 @@ func HandleDownload(file File, chFile chan File) {
 	}
 }
 
-func DownloadFile(url string, storagePath string) (err error) {
+func DownloadFile(url string, storagePath string, ws *websocket.Conn, rec *UrlData) (err error) {
     if len(url) == 0 {
 		err = errors.New("Url doesn't exsit!")
         return err
@@ -162,17 +181,14 @@ func DownloadFile(url string, storagePath string) (err error) {
     file.Url = url
     file.Name = urlSplit[len(urlSplit)-1]
     file.Path = storagePath + string(os.PathSeparator) + file.Name
+    file.Ws = ws
+    file.UrlData = rec
     go HandleDownload(file, ch)
     chReturn = <-ch
     if chReturn.ConnStatus == false {
-        if chReturn.RetryCount < tryCountLimit {
-            fmt.Println(chReturn.Msg)
-            go HandleDownload(chReturn, ch)
-        } else {
-            fmt.Println(chReturn.Msg)
-            os.Remove(file.Path)
-            err = errors.New(fmt.Sprintf("  **Give up to connect %s\n", chReturn.Name))
-        }
+        fmt.Println(chReturn.Msg)
+        os.Remove(file.Path)
+        err = errors.New(fmt.Sprintf("  **Fail to connect %s\n", chReturn.Name))
     } else {
         fmt.Println(chReturn.Msg)
     }

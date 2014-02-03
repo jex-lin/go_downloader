@@ -5,8 +5,6 @@ import (
     "net/http"
     "strings"
     "path/filepath"
-    "code.google.com/p/go.net/websocket"
-    "fmt"
     "go_downloader/model/osmod"
 )
 
@@ -42,27 +40,4 @@ func Home(w http.ResponseWriter, r *http.Request) {
     )
     t.ExecuteTemplate(w, "body", data)
 	t.Execute(w, nil)
-}
-
-func RespondProgress(ws *websocket.Conn) {
-    var err error
-
-    for {
-        var reply string
-
-        if err = websocket.Message.Receive(ws, &reply); err != nil {
-            fmt.Println("Can't receive")
-            break
-        }
-
-        fmt.Println("Received back from client: " + reply)
-
-        msg := "Received: " + reply
-        fmt.Println("Sending to client: " + msg)
-
-        if err = websocket.Message.Send(ws, msg); err != nil {
-            fmt.Println("Can't send")
-            break
-        }
-    }
 }
