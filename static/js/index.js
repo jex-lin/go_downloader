@@ -17,31 +17,6 @@ $(document).ready(function(){
         $("#url1-btn").html("Downloading...")
         $("#url1-btn").attr("disabled", "disabled");
         $("#url1-progress").show();
-
-        //$.ajax({
-        //        url: '/api/',        //指向你要請求的PHP
-        //        type: "POST",                        //如果要使用GET, 就改成 type: "GET",
-        //        data: {target: "url1", url: $("#url1").val()},                //或是用這種寫法 data: {test:1, test2:33},
-        //        beforeSend: function() {
-        //            $("#url1-btn").removeClass("btn-default btn-danger btn-success").addClass("btn-warning");
-        //            $("#url1-btn").html("Downloading...")
-        //            $("#url1-btn").attr("disabled", "disabled");
-        //            $("#url1-progress").show();
-        //        },
-        //        success: function(response) {
-        //            $("#url1-btn").removeClass("btn-warning");
-        //            var res = JSON.parse(response);
-        //            if (res["status"] == "ok") {
-        //                $("#url1-btn").addClass("btn-success");
-        //                $("#url1-btn").html("Success");
-        //            } else {
-        //                $("#url1-btn").removeAttr("disabled");
-        //                $("#url1-btn").addClass("btn-danger");
-        //                $("#url1-btn").html("Retry");
-        //            }
-        //            $("#url1-progress").hide();
-        //        },
-        //})
     })
 })
 
@@ -59,14 +34,15 @@ function connect_websocket() {
         var res = JSON.parse(e.data);
         console.log(res);
         if (res["Target"] == "url1") {
-            $("#url1-btn").removeClass("btn-warning");
             if (res["Status"] == "ok") {
+                $("#url1-btn").removeClass("btn-warning");
                 $("#url1-btn").addClass("btn-success");
                 $("#url1-btn").html("Success");
-                $("#url1-progress").hide();
+                setInterval(function(){$("#url1-progress").hide()},1000);
             } else if (res["Status"] == "keep") {
-                $("#url1-show").css("width", res["Progress"]);
+                $("#url1-show").css("width", res["Progress"]+"%");
             } else if (res["Status"] == "fail") {
+                $("#url1-btn").removeClass("btn-warning");
                 $("#url1-btn").removeAttr("disabled");
                 $("#url1-btn").addClass("btn-danger");
                 $("#url1-btn").html("Retry");
@@ -85,3 +61,27 @@ function connect_websocket() {
         console.log("[onerror] error!");
     }
 }
+//$.ajax({
+//        url: '/api/',
+//        type: "POST",
+//        data: {target: "url1", url: $("#url1").val()},
+//        beforeSend: function() {
+//            $("#url1-btn").removeClass("btn-default btn-danger btn-success").addClass("btn-warning");
+//            $("#url1-btn").html("Downloading...")
+//            $("#url1-btn").attr("disabled", "disabled");
+//            $("#url1-progress").show();
+//        },
+//        success: function(response) {
+//            $("#url1-btn").removeClass("btn-warning");
+//            var res = JSON.parse(response);
+//            if (res["status"] == "ok") {
+//                $("#url1-btn").addClass("btn-success");
+//                $("#url1-btn").html("Success");
+//            } else {
+//                $("#url1-btn").removeAttr("disabled");
+//                $("#url1-btn").addClass("btn-danger");
+//                $("#url1-btn").html("Retry");
+//            }
+//            $("#url1-progress").hide();
+//        },
+//})

@@ -31,7 +31,6 @@ type File struct {
 	Name       string
     Size       int64
 	Path       string
-	RetryCount int
 	ConnStatus bool
 	Msg        string
     Ws         *websocket.Conn
@@ -39,7 +38,6 @@ type File struct {
 }
 
 var DefaultFile = File{
-	RetryCount: 0,
 	ConnStatus: false,
 	Msg:        "",
 }
@@ -117,6 +115,7 @@ func Progress(file *File, dest *os.File, fileData io.Reader) (written int64, err
 	buf := make([]byte, 32*1024)
 
     file.UrlData.Status = "keep"
+    var flag = map[int] interface{}{}
 
 	for {
 		nr, er := fileData.Read(buf)
@@ -126,10 +125,16 @@ func Progress(file *File, dest *os.File, fileData io.Reader) (written int64, err
 				written += int64(nw)
 			}
 			p = float32(written) / float32(file.Size) * 100
-			//fmt.Printf("%s progress: %v%%\n", file.Name, int(p))
 
-            file.UrlData.Progress = int(p)
-            websocket.JSON.Send(file.Ws, file.UrlData)
+            pp := int(p)
+            if pp >= 5 && pp % 5 == 0 {
+                if flag[pp] != true {
+                    file.UrlData.Progress = pp
+                    websocket.JSON.Send(file.Ws, file.UrlData)
+                    fmt.Printf("%s progress: %v%%\n", file.Name, int(p))
+                }
+                flag[pp] = true
+            }
 
 			if ew != nil {
 				err = ew
@@ -157,8 +162,7 @@ func HandleDownload(file File, chFile chan File) {
 		file.ConnStatus = true
 		chFile <- file
 	} else {
-		file.RetryCount++
-		file.Msg = fmt.Sprintf("  **Fail to connect %s %d time(s).", file.Name, file.RetryCount)
+		file.Msg = fmt.Sprintf("  **Fail to connect %s", file.Name)
 		chFile <- file
 	}
 }
@@ -195,45 +199,45 @@ func DownloadFile(url string, storagePath string, ws *websocket.Conn, rec *UrlDa
     return
 }
 
-func DownloadFiles(urlList []string, storagePath string) (err error) {
-	if len(urlList) == 0 {
-		err = errors.New("Url doesn't exsit!")
-		return err
-	}
-
-	// Full CPU Running
-	runtime.GOMAXPROCS(runtime.NumCPU())
-
-	var chReturn File
-	var files []File
-	var file File
-
-	ch := make(chan File, len(urlList))
-	for _, url := range urlList {
-		urlSplit := strings.Split(url, "/")
-		file = DefaultFile
-		file.Url = url
-		file.Name = urlSplit[len(urlSplit)-1]
-		file.Path = storagePath + string(os.PathSeparator) + file.Name
-		files = append(files, file)
-		go HandleDownload(file, ch)
-	}
-	chCount := len(urlList)
-	for i := 0; i < chCount; i++ {
-		chReturn = <-ch
-		if chReturn.ConnStatus == false {
-			if chReturn.RetryCount < tryCountLimit {
-				fmt.Println(chReturn.Msg)
-				go HandleDownload(chReturn, ch)
-				chCount++
-			} else {
-				fmt.Println(chReturn.Msg)
-				os.Remove(file.Path)
-				err = errors.New(fmt.Sprintf("  **Give up to connect %s\n", chReturn.Name))
-			}
-		} else {
-			fmt.Println(chReturn.Msg)
-		}
-	}
-	return
-}
+//func DownloadFiles(urlList []string, storagePath string) (err error) {
+//	if len(urlList) == 0 {
+//		err = errors.New("Url doesn't exsit!")
+//		return err
+//	}
+//
+//	// Full CPU Running
+//	runtime.GOMAXPROCS(runtime.NumCPU())
+//
+//	var chReturn File
+//	var files []File
+//	var file File
+//
+//	ch := make(chan File, len(urlList))
+//	for _, url := range urlList {
+//		urlSplit := strings.Split(url, "/")
+//		file = DefaultFile
+//		file.Url = url
+//		file.Name = urlSplit[len(urlSplit)-1]
+//		file.Path = storagePath + string(os.PathSeparator) + file.Name
+//		files = append(files, file)
+//		go HandleDownload(file, ch)
+//	}
+//	chCount := len(urlList)
+//	for i := 0; i < chCount; i++ {
+//		chReturn = <-ch
+//		if chReturn.ConnStatus == false {
+//			if chReturn.RetryCount < tryCountLimit {
+//				fmt.Println(chReturn.Msg)
+//				go HandleDownload(chReturn, ch)
+//				chCount++
+//			} else {
+//				fmt.Println(chReturn.Msg)
+//				os.Remove(file.Path)
+//				err = errors.New(fmt.Sprintf("  **Give up to connect %s\n", chReturn.Name))
+//			}
+//		} else {
+//			fmt.Println(chReturn.Msg)
+//		}
+//	}
+//	return
+//}
