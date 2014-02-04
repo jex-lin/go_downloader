@@ -21,7 +21,7 @@ $(document).ready(function(){
 })
 
 function connect_websocket() {
-    ws = new WebSocket("ws://192.168.1.67:9090/api/");
+    ws = new WebSocket("ws://127.0.0.1:9090/api/");
 
     // First connect
     ws.onopen = function() {
@@ -30,23 +30,24 @@ function connect_websocket() {
 
     // Sending from server
     ws.onmessage = function(e) {
-        //console.log("[onmessage] message received: " + e.data);
         var res = JSON.parse(e.data);
         console.log(res);
         if (res["Target"] == "url1") {
             if (res["Status"] == "ok") {
-                $("#url1-btn").removeClass("btn-warning");
-                $("#url1-btn").addClass("btn-success");
-                $("#url1-btn").html("Success");
-                setInterval(function(){$("#url1-progress").hide()},1000);
+                setInterval(function(){
+                    $("#url1-btn").removeClass("btn-warning");
+                    $("#url1-btn").addClass("btn-success");
+                    $("#url1-btn").html("Success");
+                    $("#url1-progress").hide();
+                },1000);
             } else if (res["Status"] == "keep") {
                 $("#url1-show").css("width", res["Progress"]+"%");
             } else if (res["Status"] == "fail") {
+                $("#url1-progress").hide();
                 $("#url1-btn").removeClass("btn-warning");
                 $("#url1-btn").removeAttr("disabled");
                 $("#url1-btn").addClass("btn-danger");
                 $("#url1-btn").html("Retry");
-                $("#url1-progress").hide();
             }
         }
     }
