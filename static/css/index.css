@@ -11,9 +11,3 @@ body {
 .progress {
     margin-bottom: 0px;
 }
-
-
-/* index */
-#url1-progress {
-    display: none;
-}

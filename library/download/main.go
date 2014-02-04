@@ -192,7 +192,7 @@ func DownloadFile(url string, storagePath string, ws *websocket.Conn, rec *UrlDa
     if chReturn.ConnStatus == false {
         fmt.Println(chReturn.Msg)
         os.Remove(file.Path)
-        err = errors.New(fmt.Sprintf("  **Fail to connect %s\n", chReturn.Name))
+        err = errors.New(fmt.Sprintf("  **Fail to connect %s", chReturn.Name))
     } else {
         fmt.Println(chReturn.Msg)
     }

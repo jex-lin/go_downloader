@@ -50,6 +50,13 @@
                   <button class="btn btn-primary" type="submit">Check</button>
               </span>
             </div><!-- /input-group -->
+            <div class="input-group">
+              <span class="input-group-addon "><span class="glyphicon glyphicon-film"></span></span>
+              <input type="text" class="form-control" name="ffmpegPath" value="{{.ffmpegPath}}" placeholder="Please choose ffmpeg path.">
+              <span class="input-group-btn">
+                  <button class="btn btn-primary" type="submit">Check</button>
+              </span>
+            </div><!-- /input-group -->
           </div><!-- /.col-lg-6 -->
     {{if .checkPathMsg }}
           <div class="col-lg-6">
@@ -58,13 +65,16 @@
                     <div class="input-group">
                           <span class="input-group-addon"><span class="glyphicon glyphicon-globe"></span></span>
                           <input type="text" class="form-control" name="url1" id="url1" placeholder="URL">
+                          <span id="url1-play-container" class="input-group-btn hide">
+                              <button class="btn btn-default" type="button" id="url1-btn-play">Play</button>
+                          </span>
                           <span class="input-group-btn">
-                              <button class="btn btn-default" type="button" id="url1-btn">Download</button>
+                              <button class="btn btn-default" type="button" id="url1-btn-down">Download</button>
                           </span>
                       </div>
-                      <div id="url1-progress">
+                      <div id="url1-progress" class="hide">
                           <div class="progress progress-striped active">
-                              <div id="url1-show" class="progress-bar progress-bar-info"  role="progressbar" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100" style="width: 1%"> </div>
+                              <div id="url1-progress-bar" class="progress-bar progress-bar-info"  role="progressbar" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100" style="width: 1%"> </div>
                           </div>
                       </div>
                 </li>
