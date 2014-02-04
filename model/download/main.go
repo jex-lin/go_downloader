@@ -24,55 +24,47 @@ type UrlData struct {
     Progress int
     Status string
     ErrMsg string
+    FilePath string
 }
 
 type File struct {
 	Url        string
 	Name       string
     Size       int64
+    SpendTime  string
 	Path       string
 	ConnStatus bool
 	Msg        string
+    Err        error
     Ws         *websocket.Conn
     UrlData    *UrlData
 }
 
 var DefaultFile = File{
 	ConnStatus: false,
+    SpendTime: "0s",
 	Msg:        "",
+    Err:        nil,
 }
 
-type ConnReturn struct {
-	FileSize  int64
-	SpendTime string
-	Err       error
-}
-
-var DefaultConnReturn = ConnReturn{
-	FileSize:  0,
-	SpendTime: "0s",
-	Err:       nil,
-}
-
-func Download(file File) (ConnReturn ConnReturn) {
-	ConnReturn = DefaultConnReturn
+func Download(file *File) {
 
 	// Get data
 	resp, err := http.Get(file.Url)
 	if err != nil {
-		ConnReturn.Err = err
-		return ConnReturn
+		file.Err = err
+		return
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		errMsg := fmt.Sprintf("server return non-200 status: %v", resp.Status)
-		ConnReturn.Err = errors.New(errMsg)
-		return ConnReturn
+		file.Err = errors.New(errMsg)
+		return
 	}
 	i, err := strconv.Atoi(resp.Header.Get("Content-Length"))
 	if err != nil {
-		ConnReturn.Err = err
-		return ConnReturn
+		file.Err = err
+		return
 	}
     fileSize := int64(i)
 	file.Size = fileSize
@@ -81,8 +73,8 @@ func Download(file File) (ConnReturn ConnReturn) {
     isExistent, fileInfo := osmod.GetFileInfo(file.Path)
     if isExistent {
         if fileSize == fileInfo.Size() {
-            ConnReturn.FileSize = fileSize
-            return ConnReturn
+            file.Size = fileSize
+            return
         }
     }
 
@@ -92,22 +84,22 @@ func Download(file File) (ConnReturn ConnReturn) {
 	dest, err := os.Create(file.Path)
 	if err != nil {
 		errMsg := fmt.Sprintf("Can't create %s : %v", file.Path, err)
-		ConnReturn.Err = errors.New(errMsg)
-		return ConnReturn
+		file.Err = errors.New(errMsg)
+		return
 	}
 	defer dest.Close()
 
 	// Progress
 	startTime := time.Now()
-	_, err = Progress(&file, dest, fileData)
+	_, err = Progress(file, dest, fileData)
 	endTime := time.Now()
 
 	// Print result
 	subTime := endTime.Sub(startTime)
-	ConnReturn.FileSize = fileSize
-	ConnReturn.SpendTime = subTime.String()
-	ConnReturn.Err = err
-	return ConnReturn
+	file.Size = fileSize
+	file.SpendTime = subTime.String()
+	file.Err = err
+	return
 }
 
 func Progress(file *File, dest *os.File, fileData io.Reader) (written int64, err error) {
@@ -155,29 +147,28 @@ func Progress(file *File, dest *os.File, fileData io.Reader) (written int64, err
 	return written, err
 }
 
-func HandleDownload(file File, chFile chan File) {
-	ConnReturn := Download(file)
-	if ConnReturn.Err == nil {
-		file.Msg = fmt.Sprintf("%s (%d bytes) has been download! Spend time : %s", file.Name, ConnReturn.FileSize, ConnReturn.SpendTime)
+func HandleDownload(file *File, chFile chan File) {
+	Download(file)
+	if file.Err == nil {
+		file.Msg = fmt.Sprintf("%s (%d bytes) has been download! Spend time : %s", file.Name, file.Size, file.SpendTime)
 		file.ConnStatus = true
-		chFile <- file
+		chFile <- *file
 	} else {
 		file.Msg = fmt.Sprintf("  **Fail to connect %s", file.Name)
-		chFile <- file
+		chFile <- *file
 	}
 }
 
-func DownloadFile(url string, storagePath string, ws *websocket.Conn, rec *UrlData) (err error) {
+func DownloadFile(url string, storagePath string, ws *websocket.Conn, rec *UrlData) (file File) {
     if len(url) == 0 {
-		err = errors.New("Url doesn't exsit!")
-        return err
+		file.Err = errors.New("Url doesn't exsit!")
+        return file
     }
 
 	// Full CPU Running
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	var chReturn File
-	var file File
 	ch := make(chan File)
 
     urlSplit := strings.Split(url, "/")
@@ -187,12 +178,13 @@ func DownloadFile(url string, storagePath string, ws *websocket.Conn, rec *UrlDa
     file.Path = storagePath + string(os.PathSeparator) + file.Name
     file.Ws = ws
     file.UrlData = rec
-    go HandleDownload(file, ch)
+    file.UrlData.FilePath = file.Path
+    go HandleDownload(&file, ch)
     chReturn = <-ch
     if chReturn.ConnStatus == false {
         fmt.Println(chReturn.Msg)
         os.Remove(file.Path)
-        err = errors.New(fmt.Sprintf("  **Fail to connect %s", chReturn.Name))
+        chReturn.Err = errors.New(fmt.Sprintf("  **Fail to connect %s", chReturn.Name))
     } else {
         fmt.Println(chReturn.Msg)
     }

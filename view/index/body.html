@@ -23,43 +23,65 @@
 
 <div class="container">
   <div class="starter-template">
-    <h1>Bootstrap starter template</h1>
-    <p class="lead">Use this document as a way to quickly start any new project.<br> All you get is this text and a mostly barebones HTML document.</p>
+    <h1>影片下載工具</h1>
+    <p class="lead">
+          [只支援 HTML5 的瀏覽器]<br>
+          [這是一個開源專案]<br>
+          [目前僅支援 windows]
+    </p>
     {{ if .storagePath}}
-        {{if .checkPathMsg }}
+        {{if .checkStoragePath }}
             <div class="panel panel-success">
                 <div class="panel-heading">
-                    <h3 class="panel-title"><strong>"{{.storagePath}}"</strong> exists!</h3>
+                    <h3 class="panel-title"><strong>"{{.storagePath}}"</strong> 路徑存在! 影片將會存在這個目錄。</h3>
                 </div>
             </div>
         {{else}}
             <div class="panel panel-danger">
                 <div class="panel-heading">
-                    <h3 class="panel-title"><strong>"{{.storagePath}}"</strong> is not a directory!</h3>
+                    <h3 class="panel-title"><strong>"{{.storagePath}}"</strong> 不存在或者不是一個目錄!</h3>
+                </div>
+            </div>
+        {{end}}
+    {{end}}
+
+    {{ if .ffmpegPath}}
+        {{if .checkFFmpegPath }}
+            <div class="panel panel-success">
+                <div class="panel-heading">
+                    <h3 class="panel-title"><strong>"{{.ffmpegPath}}"</strong> 檔案存在! 將會使用它來播放影片。</h3>
+                </div>
+            </div>
+        {{else}}
+            <div class="panel panel-danger">
+                <div class="panel-heading">
+                    <h3 class="panel-title"><strong>"{{.ffmpegPath}}"</strong> 不存在或者不是 ffmpeg 播放器!</h3>
                 </div>
             </div>
         {{end}}
     {{end}}
     <form method="POST">
-        <div class="row">
-          <div class="col-lg-6">
+          <div class="">
             <div class="input-group">
               <span class="input-group-addon "><span class="glyphicon glyphicon-folder-open"></span></span>
-              <input type="text" class="form-control" name="storagePath" value="{{.storagePath}}" placeholder="Please select a folder that has exist to saving files that you download.">
+              <input type="text" class="form-control" name="storagePath" value="{{.storagePath}}" placeholder="選擇影片存放的路徑">
               <span class="input-group-btn">
-                  <button class="btn btn-primary" type="submit">Check</button>
+                  <button class="btn btn-primary" type="submit">檢查</button>
               </span>
             </div><!-- /input-group -->
+          {{ if .isWindows}}
             <div class="input-group">
               <span class="input-group-addon "><span class="glyphicon glyphicon-film"></span></span>
-              <input type="text" class="form-control" name="ffmpegPath" value="{{.ffmpegPath}}" placeholder="Please choose ffmpeg path.">
+              <input type="text" class="form-control" id="ffmpeg-path" name="ffmpegPath" value="{{.ffmpegPath}}" placeholder="選擇 ffmpeg 播放器(ffplay.exe) 路徑(ex: C:\Users\me\Desktop\ffplay.exe)">
               <span class="input-group-btn">
-                  <button class="btn btn-primary" type="submit">Check</button>
+                  <button class="btn btn-primary" type="submit">檢查</button>
               </span>
             </div><!-- /input-group -->
-          </div><!-- /.col-lg-6 -->
-    {{if .checkPathMsg }}
-          <div class="col-lg-6">
+          {{end}}
+          </div>
+      </form>
+    {{if .checkStoragePath }}
+          <div>
             <ul class="list-group">
                 <li id="url1-list-group-item" class="list-group-item list-group-item-info">
                     <div class="input-group">
@@ -75,18 +97,9 @@
                           <div id="url1-progress-bar" class="progress-bar progress-bar-info"  role="progressbar" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100" style="width: 1%"> </div>
                       </div>
                 </li>
-                <li class="list-group-item list-group-item-info">Cras sit amet nibh libero</li>
-                <li class="list-group-item list-group-item-warning">Porta ac consectetur ac</li>
-                <li class="list-group-item list-group-item-danger">Vestibulum at eros</li>
             </ul>
           </div><!-- /.col-lg-6 -->
     {{end}}
-        
-        <div class="col-lg-6">
-        </div>
-        </div><!-- /.row -->
-    </form>
-  </div>
 </div><!-- /.container -->
 {{template "footer"}}
 {{end}}

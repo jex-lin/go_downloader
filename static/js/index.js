@@ -1,6 +1,24 @@
 $(document).ready(function(){
     connect_websocket();
 
+    $("#url1-play-container").click(function(){
+        if ($("#ffmpeg-path").val() != "") {
+            $.ajax({
+                url: '/playVideo/',
+                type: "POST",
+                data: {FFmpegPath: $("#ffmpeg-path").val(), FilePath: $(this).attr("data-filepath")},
+                Success: function(response) {
+                    var res = JSON.parse(response);
+                    if (res["Status"] == "fail") {
+                        alert(res["ErrMsg"]);
+                    }
+                }
+            })
+        } else {
+            alert("請選擇 ffmpeg 播放器路徑");
+            $("#ffmpeg-path").focus();
+        }
+    })
     $("#url1-download-container").click(function() {
         var data = {
             "Target" : "url1",
@@ -11,20 +29,29 @@ $(document).ready(function(){
         $(this).addClass("hide");
         $("#url1-wait-container").removeClass("hide");
         $("#url1-progress-container").removeClass("hide");
+        set_list_item_warning($("#url1-list-group-item"))
     })
 })
 
 function set_list_item_success($this) {
-    $this.removeClass("list-group-item-info");
-    $this.removeClass("list-group-item-danger");
+    $this.removeClass("list-group-item-warning");
     $this.addClass("list-group-item-success");
 }
 
-function set_list_item_error($this) {
+function set_list_item_warning($this) {
     if ($this.hasClass("list-group-item-info")) {
         $this.removeClass("list-group-item-info");
-        $this.addClass("list-group-item-danger");
+        $this.addClass("list-group-item-warning");
     }
+    if ($this.hasClass("list-group-item-danger")) {
+        $this.removeClass("list-group-item-danger");
+        $this.addClass("list-group-item-warning");
+    }
+}
+
+function set_list_item_error($this) {
+    $this.removeClass("list-group-item-warning");
+    $this.addClass("list-group-item-danger");
 }
 
 function connect_websocket() {
@@ -40,7 +67,7 @@ function connect_websocket() {
         var res = JSON.parse(e.data);
         if (res["Target"] == "url1") {
             if (res["Status"] == "ok") {
-                setInterval(function(){
+                setTimeout(function(){
                     $("#url1-download-container").addClass("hide");
                     $("#url1-progress-container").addClass("hide");
                     $("#url1-status-ok").removeClass("hide");
@@ -49,9 +76,13 @@ function connect_websocket() {
                     $("#url1-play-container").removeClass("hide");
                     $("#url1").attr("disabled", "disabled");
                     set_list_item_success($("#url1-list-group-item"));
+                    if ($("#url1-play-container").data("filepath") != "undefined") {
+                        $("#url1-play-container").attr("data-filepath", res["FilePath"]);
+                    }
                 }, 1000);
             } else if (res["Status"] == "keep") {
                 if ($("#url1-play-container").hasClass("hide")) {
+                    $("#url1-play-container").attr("data-filepath", res["FilePath"]);
                     $("#url1-play-container").removeClass("hide");
                 }
                 $("#url1-progress-bar").css("width", res["Progress"]+"%");
@@ -77,27 +108,3 @@ function connect_websocket() {
         console.log("[onerror] error!");
     }
 }
-//$.ajax({
-//        url: '/api/',
-//        type: "POST",
-//        data: {target: "url1", url: $("#url1").val()},
-//        beforeSend: function() {
-//            $("#url1-btn").removeClass("btn-default btn-danger btn-success").addClass("btn-warning");
-//            $("#url1-btn").html("Downloading...")
-//            $("#url1-btn").attr("disabled", "disabled");
-//            $("#url1-progress").show();
-//        },
-//        success: function(response) {
-//            $("#url1-btn").removeClass("btn-warning");
-//            var res = JSON.parse(response);
-//            if (res["status"] == "ok") {
-//                $("#url1-btn").addClass("btn-success");
-//                $("#url1-btn").html("Success");
-//            } else {
-//                $("#url1-btn").removeAttr("disabled");
-//                $("#url1-btn").addClass("btn-danger");
-//                $("#url1-btn").html("Retry");
-//            }
-//            $("#url1-progress").hide();
-//        },
-//})

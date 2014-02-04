@@ -6,9 +6,12 @@ import (
     "strings"
     "path/filepath"
     "go_downloader/model/osmod"
-    "go_downloader/library/download"
+    "go_downloader/model/download"
     "code.google.com/p/go.net/websocket"
     "fmt"
+    "os/exec"
+    "runtime"
+    "encoding/json"
 )
 
 // Static file (img, js, css)
@@ -24,12 +27,26 @@ func Home(w http.ResponseWriter, r *http.Request) {
     r.ParseForm()
     if r.Method == "POST" {
         storagePath := strings.TrimSpace(r.FormValue("storagePath"))
+        ffmpegPath := strings.TrimSpace(r.FormValue("ffmpegPath"))
         storagePath = filepath.Clean(storagePath)
         data["storagePath"] = storagePath
         if osmod.SetStoragePath(storagePath) {
-            data["checkPathMsg"] = true
+            data["checkStoragePath"] = true
         } else {
-            data["checkPathMsg"] = false
+            data["checkStoragePath"] = false
+        }
+        if runtime.GOOS == "windows" {
+            data["isWindows"] = true
+        }
+        if ffmpegPath != "" {
+            ffmpegPath = filepath.Clean(ffmpegPath)
+            data["ffmpegPath"] = ffmpegPath
+            if osmod.FileExists(ffmpegPath) {
+                data["checkFFmpegPath"] = true
+            } else {
+
+                data["checkFFmpegPath"] = false
+            }
         }
     }
 
@@ -49,6 +66,7 @@ func Download(ws *websocket.Conn) {
 
     var err error
     var rec download.UrlData
+    var file download.File
 
     for {
         err = websocket.JSON.Receive(ws, &rec)
@@ -68,13 +86,14 @@ func Download(ws *websocket.Conn) {
             break
         }
 
-        err = download.DownloadFile(rec.Url, storagePath, ws, &rec);
-        if  err != nil {
+        file = download.DownloadFile(rec.Url, storagePath, ws, &rec);
+        if  file.Err != nil {
             rec.Status = "fail"
-            rec.ErrMsg = err.Error()
+            rec.ErrMsg = file.Err.Error()
         } else {
             // Success
             rec.Status = "ok"
+            rec.FilePath = file.UrlData.FilePath
         }
 
         if err = websocket.JSON.Send(ws, rec); err != nil {
@@ -82,72 +101,34 @@ func Download(ws *websocket.Conn) {
             break
         }
     }
-
-    //output := map[string] interface{} {}
-
-    //storagePath, err := osmod.GetStoragePath()
-    //if err != nil {
-    //    output["status"] = "fail"
-    //    output["errMsg"] = err.Error()
-    //    outputJson, _ := json.Marshal(output);
-    //    fmt.Fprintf(w, string(outputJson))
-    //    return
-    //}
-    //// Receive post
-    //r.ParseForm()
-    //if r.Method == "POST" {
-    //    url := strings.TrimSpace(r.FormValue("url"))
-    //    err := download.DownloadFile(url, storagePath);
-    //    if  err != nil {
-    //        output["status"] = "fail"
-    //        output["errMsg"] = err.Error()
-    //        outputJson, _ := json.Marshal(output);
-    //        fmt.Fprintf(w, string(outputJson))
-    //        return
-    //    }
-    //    output["status"] = "ok"
-    //    outputJson, _ := json.Marshal(output);
-    //    fmt.Fprintf(w, string(outputJson))
-    //}
-
 }
-//func Api(w http.ResponseWriter, r *http.Request) {
-//
-//    output := map[string] interface{} {}
-//
-//    storagePath, err := osmod.GetStoragePath()
-//    if err != nil {
-//        output["status"] = "fail"
-//        output["errMsg"] = err.Error()
-//        outputJson, _ := json.Marshal(output);
-//        fmt.Fprintf(w, string(outputJson))
-//        return
-//    }
-//    // Receive post
-//    r.ParseForm()
-//    if r.Method == "POST" {
-//        url := strings.TrimSpace(r.FormValue("url"))
-//        err := download.DownloadFile(url, storagePath);
-//        if  err != nil {
-//            output["status"] = "fail"
-//            output["errMsg"] = err.Error()
-//            outputJson, _ := json.Marshal(output);
-//            fmt.Fprintf(w, string(outputJson))
-//            return
-//        }
-//        output["status"] = "ok"
-//        outputJson, _ := json.Marshal(output);
-//        fmt.Fprintf(w, string(outputJson))
-//    }
-//}
 
-//dec := json.NewDecoder(strings.NewReader(jsonStream)) 
-//dec.Decode(&m);
+func PlayVideo(w http.ResponseWriter, r *http.Request) {
+    output := map[string] interface{} {}
 
-//add custom http header
-//
-//client := &amp;http.Client{]
-//req, err := http.NewRequest("POST", "http://example.com", bytes.NewReader(postData))
-//req.Header.Add("User-Agent", "myClient")
-//resp, err := client.Do(req)
-//defer resp.Body.Close()
+    // Receive post
+    r.ParseForm()
+    if r.Method == "POST" {
+        ffmpegPath := filepath.Clean(strings.TrimSpace(r.FormValue("FFmpegPath")))
+        filePath := filepath.Clean(strings.TrimSpace(r.FormValue("FilePath")))
+        
+        if ! osmod.FileExists(ffmpegPath) || ! osmod.FileExists(filePath) {
+            output["Status"] = "fail"
+            output["ErrMsg"] = "FFmpeg path or file path doesn't exist."
+            outputJSON, _ := json.Marshal(output)
+            fmt.Fprintf(w, string(outputJSON))
+            return
+        }
+
+        cmd := exec.Command(ffmpegPath, filePath)
+        err := cmd.Run()
+        if err == nil {
+            output["Status"] = "ok"
+        } else {
+            output["Status"] = "fail"
+            output["ErrMsg"] = err.Error()
+        }
+        outputJSON, _ := json.Marshal(output);
+        fmt.Fprintf(w, string(outputJSON))
+    }
+}
