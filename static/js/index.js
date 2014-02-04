@@ -21,7 +21,7 @@ $(document).ready(function(){
 })
 
 function connect_websocket() {
-    ws = new WebSocket("ws://127.0.0.1:9090/api/");
+    ws = new WebSocket("ws://127.0.0.1:9090/download/");
 
     // First connect
     ws.onopen = function() {
