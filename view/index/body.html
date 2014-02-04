@@ -61,21 +61,18 @@
     {{if .checkPathMsg }}
           <div class="col-lg-6">
             <ul class="list-group">
-                <li class="list-group-item list-group-item-success">
+                <li id="url1-list-group-item" class="list-group-item list-group-item-info">
                     <div class="input-group">
+                          <span id="url1-status-ok" class="input-group-addon hide"><span class="glyphicon glyphicon-ok"></span></span>
+                          <span id="url1-status-fail" class="input-group-addon hide"><span class="glyphicon glyphicon-remove"></span></span>
                           <span class="input-group-addon"><span class="glyphicon glyphicon-globe"></span></span>
                           <input type="text" class="form-control" name="url1" id="url1" placeholder="URL">
-                          <span id="url1-play-container" class="input-group-btn hide">
-                              <button class="btn btn-default" type="button" id="url1-btn-play">Play</button>
-                          </span>
-                          <span class="input-group-btn">
-                              <button class="btn btn-default" type="button" id="url1-btn-down">Download</button>
-                          </span>
+                          <span id="url1-play-container" class="input-group-addon hide"><span class="glyphicon glyphicon-play"></span></span>
+                          <span id="url1-wait-container" class="input-group-addon hide"><span class="glyphicon glyphicon-time"></span></span>
+                          <span id="url1-download-container" class="input-group-addon"><span class="glyphicon glyphicon-download-alt"></span></span>
                       </div>
-                      <div id="url1-progress" class="hide">
-                          <div class="progress progress-striped active">
-                              <div id="url1-progress-bar" class="progress-bar progress-bar-info"  role="progressbar" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100" style="width: 1%"> </div>
-                          </div>
+                      <div id="url1-progress-container" class="progress progress-striped active hide">
+                          <div id="url1-progress-bar" class="progress-bar progress-bar-info"  role="progressbar" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100" style="width: 1%"> </div>
                       </div>
                 </li>
                 <li class="list-group-item list-group-item-info">Cras sit amet nibh libero</li>
