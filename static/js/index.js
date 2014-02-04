@@ -1,6 +1,14 @@
 $(document).ready(function(){
     connect_websocket();
 
+    $("#shutdown").click(function(){
+        $.ajax({
+            url: '/',
+            type: "POST",
+            data: {shutdown: 1}
+        })
+        location.reload();
+    })
     $("#url1-play-container").click(function(){
         if ($("#ffmpeg-path").val() != "") {
             $.ajax({

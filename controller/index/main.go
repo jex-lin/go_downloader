@@ -9,6 +9,8 @@ import (
     "go_downloader/model/download"
     "code.google.com/p/go.net/websocket"
     "fmt"
+    "os"
+    "strconv"
     "os/exec"
     "runtime"
     "encoding/json"
@@ -26,6 +28,16 @@ func Home(w http.ResponseWriter, r *http.Request) {
     // Receive post
     r.ParseForm()
     if r.Method == "POST" {
+        // shutdown
+        shutdown := strings.TrimSpace(r.FormValue("shutdown"))
+        if shutdown != "" {
+            shutdownValue, _ := strconv.Atoi(shutdown)
+            if shutdownValue == 1 {
+                os.Exit(0)
+            }    
+        }
+        
+
         storagePath := strings.TrimSpace(r.FormValue("storagePath"))
         ffmpegPath := strings.TrimSpace(r.FormValue("ffmpegPath"))
         storagePath = filepath.Clean(storagePath)
@@ -34,9 +46,6 @@ func Home(w http.ResponseWriter, r *http.Request) {
             data["checkStoragePath"] = true
         } else {
             data["checkStoragePath"] = false
-        }
-        if runtime.GOOS == "windows" {
-            data["isWindows"] = true
         }
         if ffmpegPath != "" {
             ffmpegPath = filepath.Clean(ffmpegPath)
@@ -48,6 +57,9 @@ func Home(w http.ResponseWriter, r *http.Request) {
                 data["checkFFmpegPath"] = false
             }
         }
+    }
+    if runtime.GOOS == "windows" {
+        data["isWindows"] = true
     }
 
     // Show view
