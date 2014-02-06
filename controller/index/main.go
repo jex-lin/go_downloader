@@ -14,6 +14,7 @@ import (
     "os/exec"
     "runtime"
     "encoding/json"
+    "bytes"
 )
 
 // Static file (img, js, css)
@@ -36,16 +37,17 @@ func Home(w http.ResponseWriter, r *http.Request) {
                 os.Exit(0)
             }    
         }
-        
 
         storagePath := strings.TrimSpace(r.FormValue("storagePath"))
         ffmpegPath := strings.TrimSpace(r.FormValue("ffmpegPath"))
-        storagePath = filepath.Clean(storagePath)
-        data["storagePath"] = storagePath
-        if osmod.SetStoragePath(storagePath) {
-            data["checkStoragePath"] = true
-        } else {
-            data["checkStoragePath"] = false
+        if storagePath != "" {
+            storagePath = filepath.Clean(storagePath)
+            data["storagePath"] = storagePath
+            if osmod.SetStoragePath(storagePath) {
+                data["checkStoragePath"] = true
+            } else {
+                data["checkStoragePath"] = false
+            }
         }
         if ffmpegPath != "" {
             ffmpegPath = filepath.Clean(ffmpegPath)
@@ -53,9 +55,24 @@ func Home(w http.ResponseWriter, r *http.Request) {
             if osmod.FileExists(ffmpegPath) {
                 data["checkFFmpegPath"] = true
             } else {
-
                 data["checkFFmpegPath"] = false
             }
+        }
+    } else {
+        // Current path
+        currentPath, err := os.Getwd()
+        if err != nil {
+            fmt.Println(err)
+            currentPath = ""
+        }
+        if currentPath != "" {
+            data["checkStoragePath"] = true
+            data["storagePath"] = currentPath
+        }
+        if currentPath != "" {
+            ffplayPath := currentPath + string(os.PathSeparator) + "ffplay.exe"
+            data["checkFFmpegPath"] = true
+            data["ffmpegPath"] = ffplayPath
         }
     }
     if runtime.GOOS == "windows" {
@@ -68,8 +85,19 @@ func Home(w http.ResponseWriter, r *http.Request) {
     t, _ := template.ParseFiles(
         tmplPath + "header.tmpl",
         indexPath + "body.html",
+        tmplPath + "index/urlItem.tmpl",
         tmplPath + "footer.tmpl",
     )
+
+    // For loop url item
+    var tmplBuf bytes.Buffer
+    var nums = map[string] interface{}{}
+    for num := 1; num <= 10; num++ {
+        nums["num"] = num
+        t.ExecuteTemplate(&tmplBuf, "urlItem", nums)
+    }
+    data["urlItem"] = template.HTML(tmplBuf.String())
+
     t.ExecuteTemplate(w, "body", data)
 	t.Execute(w, nil)
 }
@@ -79,6 +107,9 @@ func Download(ws *websocket.Conn) {
     var err error
     var rec download.UrlData
     var file download.File
+
+    // Full CPU Running
+    runtime.GOMAXPROCS(runtime.NumCPU())
 
     for {
         err = websocket.JSON.Receive(ws, &rec)

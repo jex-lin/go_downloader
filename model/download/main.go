@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -164,9 +163,6 @@ func DownloadFile(url string, storagePath string, ws *websocket.Conn, rec *UrlDa
 		file.Err = errors.New("Url doesn't exsit!")
         return file
     }
-
-	// Full CPU Running
-	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	var chReturn File
 	ch := make(chan File)
