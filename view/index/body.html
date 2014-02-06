@@ -69,7 +69,7 @@
               </span>
             </div><!-- /input-group -->
           {{ if .isWindows}}
-            <div class="input-group">
+            <div class="input-group" style="margin-top: 10px;">
               <span class="input-group-addon "><span class="glyphicon glyphicon-film"></span></span>
               <input type="text" class="form-control" id="ffmpeg-path" name="ffmpegPath" value="{{.ffmpegPath}}">
               <span class="input-group-btn">
@@ -82,20 +82,7 @@
     {{if .checkStoragePath }}
           <div>
             <ul class="list-group">
-                <li id="url1-list-group-item" class="list-group-item list-group-item-info">
-                    <div class="input-group">
-                          <span id="url1-status-ok" class="input-group-addon hide"><span class="glyphicon glyphicon-ok"></span></span>
-                          <span id="url1-status-fail" class="input-group-addon hide"><span class="glyphicon glyphicon-remove"></span></span>
-                          <span class="input-group-addon"><span class="glyphicon glyphicon-globe"></span></span>
-                          <input type="text" class="form-control" name="url1" id="url1" placeholder="URL">
-                          <span id="url1-play-container" class="input-group-addon hide"><span class="glyphicon glyphicon-play"></span></span>
-                          <span id="url1-wait-container" class="input-group-addon hide"><span class="glyphicon glyphicon-time"></span></span>
-                          <span id="url1-download-container" class="input-group-addon"><span class="glyphicon glyphicon-download-alt"></span></span>
-                      </div>
-                      <div id="url1-progress-container" class="progress progress-striped active hide">
-                          <div id="url1-progress-bar" class="progress-bar progress-bar-info"  role="progressbar" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100" style="width: 1%"> </div>
-                      </div>
-                </li>
+                {{.urlItem}}
             </ul>
           </div><!-- /.col-lg-6 -->
     {{end}}

@@ -9,35 +9,38 @@ $(document).ready(function(){
         })
         location.reload();
     })
-    $("#url1-play-container").click(function(){
-        if ($("#ffmpeg-path").val() != "") {
-            $.ajax({
-                url: '/playVideo/',
-                type: "POST",
-                data: {FFmpegPath: $("#ffmpeg-path").val(), FilePath: $(this).attr("data-filepath")},
-                Success: function(response) {
-                    var res = JSON.parse(response);
-                    if (res["Status"] == "fail") {
-                        alert(res["ErrMsg"]);
+    $("[id^=url]").click(function(){
+        var num = $(this).data("num");
+        $("#url-" + num + "-play-container").click(function(){
+            if ($("#ffmpeg-path").val() != "") {
+                $.ajax({
+                    url: '/playVideo/',
+                    type: "POST",
+                    data: {FFmpegPath: $("#ffmpeg-path").val(), FilePath: $(this).attr("data-filepath")},
+                    Success: function(response) {
+                        var res = JSON.parse(response);
+                        if (res["Status"] == "fail") {
+                            alert(res["ErrMsg"]);
+                        }
                     }
-                }
-            })
-        } else {
-            alert("請選擇 ffmpeg 播放器路徑");
-            $("#ffmpeg-path").focus();
-        }
-    })
-    $("#url1-download-container").click(function() {
-        var data = {
-            "Target" : "url1",
-            "Url"    : $("#url1").val()
-        };
-        ws.send(JSON.stringify(data));
+                })
+            } else {
+                alert("請選擇 ffmpeg 播放器路徑");
+                $("#ffmpeg-path").focus();
+            }
+        })
+        $("#url-" + num + "-download-container").click(function() {
+            var data = {
+                "Target" : "#url-" + num ,
+                "Url"    : $("#url-" + num).val()
+            };
+            ws.send(JSON.stringify(data));
 
-        $(this).addClass("hide");
-        $("#url1-wait-container").removeClass("hide");
-        $("#url1-progress-container").removeClass("hide");
-        set_list_item_warning($("#url1-list-group-item"))
+            $(this).addClass("hide");
+            $("#url-" + num + "-wait-container").removeClass("hide");
+            $("#url-" + num + "-progress-container").removeClass("hide");
+            set_list_item_warning($("#url-" + num + "-list-group-item"))
+        })
     })
 })
 
@@ -73,36 +76,34 @@ function connect_websocket() {
     // Sending from server
     ws.onmessage = function(e) {
         var res = JSON.parse(e.data);
-        if (res["Target"] == "url1") {
-            if (res["Status"] == "ok") {
-                setTimeout(function(){
-                    $("#url1-download-container").addClass("hide");
-                    $("#url1-progress-container").addClass("hide");
-                    $("#url1-status-ok").removeClass("hide");
-                    $("#url1-status-fail").addClass("hide");
-                    $("#url1-wait-container").addClass("hide");
-                    $("#url1-play-container").removeClass("hide");
-                    $("#url1").attr("disabled", "disabled");
-                    set_list_item_success($("#url1-list-group-item"));
-                    if ($("#url1-play-container").data("filepath") != "undefined") {
-                        $("#url1-play-container").attr("data-filepath", res["FilePath"]);
-                    }
-                }, 1000);
-            } else if (res["Status"] == "keep") {
-                if ($("#url1-play-container").hasClass("hide")) {
-                    $("#url1-play-container").attr("data-filepath", res["FilePath"]);
-                    $("#url1-play-container").removeClass("hide");
+        if (res["Status"] == "ok") {
+            setTimeout(function(){
+                $(res["Target"] + "-download-container").addClass("hide");
+                $(res["Target"] + "-progress-container").addClass("hide");
+                $(res["Target"] + "-status-ok").removeClass("hide");
+                $(res["Target"] + "-status-fail").addClass("hide");
+                $(res["Target"] + "-wait-container").addClass("hide");
+                $(res["Target"] + "-play-container").removeClass("hide");
+                $(res["Target"] + "").attr("disabled", "disabled");
+                set_list_item_success($(res["Target"] + "-list-group-item"));
+                if ($(res["Target"] + "-play-container").data("filepath") != "undefined") {
+                    $(res["Target"] + "-play-container").attr("data-filepath", res["FilePath"]);
                 }
-                $("#url1-progress-bar").css("width", res["Progress"]+"%");
-            } else if (res["Status"] == "fail") {
-                $("#url1-play-container").addClass("hide");
-                $("#url1-wait-container").addClass("hide");
-                $("#url1-download-container").removeClass("hide");
-                $("#url1-progress-container").addClass("hide");
-                $("#url1-status-ok").addClass("hide");
-                $("#url1-status-fail").removeClass("hide");
-                set_list_item_error($("#url1-list-group-item"));
+            }, 1000);
+        } else if (res["Status"] == "keep") {
+            if ($(res["Target"] + "-play-container").hasClass("hide")) {
+                $(res["Target"] + "-play-container").attr("data-filepath", res["FilePath"]);
+                $(res["Target"] + "-play-container").removeClass("hide");
             }
+            $(res["Target"] + "-progress-bar").css("width", res["Progress"]+"%");
+        } else if (res["Status"] == "fail") {
+            $(res["Target"] + "-play-container").addClass("hide");
+            $(res["Target"] + "-wait-container").addClass("hide");
+            $(res["Target"] + "-download-container").removeClass("hide");
+            $(res["Target"] + "-progress-container").addClass("hide");
+            $(res["Target"] + "-status-ok").addClass("hide");
+            $(res["Target"] + "-status-fail").removeClass("hide");
+            set_list_item_error($(res["Target"] + "-list-group-item"));
         }
     }
 

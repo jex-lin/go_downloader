@@ -23,7 +23,7 @@ func Static(w http.ResponseWriter, r *http.Request) {
 }
 
 func Home(w http.ResponseWriter, r *http.Request) {
-    // Prepare data
+
     var data = map[string] interface{}{}
 
     // Receive post
@@ -59,22 +59,24 @@ func Home(w http.ResponseWriter, r *http.Request) {
             }
         }
     } else {
-        // Current path
+        // Default data
         currentPath, err := os.Getwd()
         if err != nil {
             fmt.Println(err)
             currentPath = ""
         }
         if currentPath != "" {
+            // Storage path
+            osmod.SetStoragePath(currentPath)
             data["checkStoragePath"] = true
             data["storagePath"] = currentPath
-        }
-        if currentPath != "" {
+            // ffplay path
             ffplayPath := currentPath + string(os.PathSeparator) + "ffplay.exe"
             data["checkFFmpegPath"] = true
             data["ffmpegPath"] = ffplayPath
         }
     }
+
     if runtime.GOOS == "windows" {
         data["isWindows"] = true
     }
