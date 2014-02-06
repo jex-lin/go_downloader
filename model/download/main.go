@@ -146,86 +146,26 @@ func Progress(file *File, dest *os.File, fileData io.Reader) (written int64, err
 	return written, err
 }
 
-func HandleDownload(file *File, chFile chan File) {
+func HandleDownload(file *File) {
 	Download(file)
 	if file.Err == nil {
 		file.Msg = fmt.Sprintf("%s (%d bytes) has been download! Spend time : %s", file.Name, file.Size, file.SpendTime)
 		file.ConnStatus = true
-		chFile <- *file
 	} else {
 		file.Msg = fmt.Sprintf("  **Fail to connect %s", file.Name)
-		chFile <- *file
+        file.Err = errors.New(fmt.Sprintf("  **Fail to connect %s", file.Name))
 	}
 }
 
-func DownloadFile(url string, storagePath string, ws *websocket.Conn, rec *UrlData) (file File) {
-    if len(url) == 0 {
-		file.Err = errors.New("Url doesn't exsit!")
-        return file
-    }
-
-	var chReturn File
-	ch := make(chan File)
-
+func DownloadFile(url string, storagePath string, ws *websocket.Conn, rec *UrlData, ch chan File) {
     urlSplit := strings.Split(url, "/")
-    file = DefaultFile
+    file := DefaultFile
     file.Url = url
     file.Name = urlSplit[len(urlSplit)-1]
     file.Path = storagePath + string(os.PathSeparator) + file.Name
     file.Ws = ws
     file.UrlData = rec
     file.UrlData.FilePath = file.Path
-    go HandleDownload(&file, ch)
-    chReturn = <-ch
-    if chReturn.ConnStatus == false {
-        fmt.Println(chReturn.Msg)
-        os.Remove(file.Path)
-        chReturn.Err = errors.New(fmt.Sprintf("  **Fail to connect %s", chReturn.Name))
-    } else {
-        fmt.Println(chReturn.Msg)
-    }
-    return
+    HandleDownload(&file)
+    ch <- file
 }
-
-//func DownloadFiles(urlList []string, storagePath string) (err error) {
-//	if len(urlList) == 0 {
-//		err = errors.New("Url doesn't exsit!")
-//		return err
-//	}
-//
-//	// Full CPU Running
-//	runtime.GOMAXPROCS(runtime.NumCPU())
-//
-//	var chReturn File
-//	var files []File
-//	var file File
-//
-//	ch := make(chan File, len(urlList))
-//	for _, url := range urlList {
-//		urlSplit := strings.Split(url, "/")
-//		file = DefaultFile
-//		file.Url = url
-//		file.Name = urlSplit[len(urlSplit)-1]
-//		file.Path = storagePath + string(os.PathSeparator) + file.Name
-//		files = append(files, file)
-//		go HandleDownload(file, ch)
-//	}
-//	chCount := len(urlList)
-//	for i := 0; i < chCount; i++ {
-//		chReturn = <-ch
-//		if chReturn.ConnStatus == false {
-//			if chReturn.RetryCount < tryCountLimit {
-//				fmt.Println(chReturn.Msg)
-//				go HandleDownload(chReturn, ch)
-//				chCount++
-//			} else {
-//				fmt.Println(chReturn.Msg)
-//				os.Remove(file.Path)
-//				err = errors.New(fmt.Sprintf("  **Give up to connect %s\n", chReturn.Name))
-//			}
-//		} else {
-//			fmt.Println(chReturn.Msg)
-//		}
-//	}
-//	return
-//}

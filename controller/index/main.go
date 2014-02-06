@@ -109,6 +109,7 @@ func Download(ws *websocket.Conn) {
     var err error
     var rec download.UrlData
     var file download.File
+    ch := make(chan download.File)
 
     // Full CPU Running
     runtime.GOMAXPROCS(runtime.NumCPU())
@@ -131,14 +132,19 @@ func Download(ws *websocket.Conn) {
             break
         }
 
-        file = download.DownloadFile(rec.Url, storagePath, ws, &rec);
+        go download.DownloadFile(rec.Url, storagePath, ws, &rec, ch);
+        file = <-ch
+        fmt.Println(file)
         if  file.Err != nil {
             rec.Status = "fail"
             rec.ErrMsg = file.Err.Error()
+            os.Remove(file.Path)
+            fmt.Println(file.Msg)
         } else {
             // Success
             rec.Status = "ok"
             rec.FilePath = file.UrlData.FilePath
+            fmt.Println(file.Msg)
         }
 
         if err = websocket.JSON.Send(ws, rec); err != nil {
