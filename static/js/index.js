@@ -100,7 +100,6 @@ function connect_websocket(ws) {
                 if ($(res["Target"] + "-play-container").data("filepath") != "undefined") {
                     $(res["Target"] + "-play-container").attr("data-filepath", res["FilePath"]);
                 }
-                ws.close();
             }, 1000);
         } else if (res["Status"] == "keep") {
             if ($(res["Target"] + "-play-container").hasClass("hide")) {

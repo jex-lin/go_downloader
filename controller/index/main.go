@@ -144,7 +144,13 @@ func Download(ws *websocket.Conn) {
             fmt.Println(rec.Msg)
         }
 
-        if err = websocket.JSON.Send(ws, rec); err != nil {
+        if err = websocket.JSON.Send(ws, rec); err == nil {
+            // If success then close connection.
+            if errNum == 1 {
+                fmt.Println("Close websocket connection.")
+                ws.Close()
+            }
+        } else {
             fmt.Println("Can't send")
             break
         }
