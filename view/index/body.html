@@ -44,6 +44,7 @@
         {{end}}
     {{end}}
 
+{{ if .isWindows}}
     {{ if .ffmpegPath}}
         {{if .checkFFmpegPath }}
             <div class="panel panel-success">
@@ -59,6 +60,7 @@
             </div>
         {{end}}
     {{end}}
+{{end}}
     <form method="POST">
           <div class="">
             <div class="input-group">

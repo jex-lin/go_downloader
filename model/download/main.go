@@ -17,12 +17,12 @@ const (
 	tryCountLimit int           = 1
 )
 
-type UrlData struct {
+type RespData struct {
     Target string
     Url string
     Progress int
     Status string
-    ErrMsg string
+    Msg string
     FilePath string
 }
 
@@ -33,36 +33,29 @@ type File struct {
     SpendTime  string
 	Path       string
 	ConnStatus bool
-	Msg        string
-    Err        error
     Ws         *websocket.Conn
-    UrlData    *UrlData
+    RespData    *RespData
 }
 
 var DefaultFile = File{
 	ConnStatus: false,
     SpendTime: "0s",
-	Msg:        "",
-    Err:        nil,
 }
 
-func Download(file *File) {
-
+func (file *File) Download () (err error){
 	// Get data
 	resp, err := http.Get(file.Url)
 	if err != nil {
-		file.Err = err
 		return
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		errMsg := fmt.Sprintf("server return non-200 status: %v", resp.Status)
-		file.Err = errors.New(errMsg)
+		err = errors.New(errMsg)
 		return
 	}
 	i, err := strconv.Atoi(resp.Header.Get("Content-Length"))
 	if err != nil {
-		file.Err = err
 		return
 	}
     fileSize := int64(i)
@@ -83,29 +76,49 @@ func Download(file *File) {
 	dest, err := os.Create(file.Path)
 	if err != nil {
 		errMsg := fmt.Sprintf("Can't create %s : %v", file.Path, err)
-		file.Err = errors.New(errMsg)
+		err = errors.New(errMsg)
 		return
 	}
 	defer dest.Close()
 
 	// Progress
 	startTime := time.Now()
-	_, err = Progress(file, dest, fileData)
+	_, err = file.progress(dest, fileData)
 	endTime := time.Now()
 
 	// Print result
 	subTime := endTime.Sub(startTime)
 	file.Size = fileSize
 	file.SpendTime = subTime.String()
-	file.Err = err
 	return
 }
 
-func Progress(file *File, dest *os.File, fileData io.Reader) (written int64, err error) {
+func DownloadFile(url string, storagePath string, ws *websocket.Conn, rec *RespData, ch chan int) {
+    urlSplit := strings.Split(url, "/")
+    file := DefaultFile
+    file.Url = url
+    file.Name = urlSplit[len(urlSplit)-1]
+    file.Path = storagePath + string(os.PathSeparator) + file.Name
+    file.Ws = ws
+    file.RespData = rec
+    file.RespData.FilePath = file.Path
+
+	err := file.Download()
+	if err == nil {
+		file.RespData.Msg = fmt.Sprintf("%s (%d bytes) has been download! Spend time : %s", file.Name, file.Size, file.SpendTime)
+		file.ConnStatus = true
+        ch <- 1
+	} else {
+		file.RespData.Msg = fmt.Sprintf("  **Fail to connect %s", file.Name)
+        ch <- 0
+	}
+}
+
+func (file *File) progress(dest *os.File, fileData io.Reader) (written int64, err error) {
 	var p float32
 	buf := make([]byte, 32*1024)
 
-    file.UrlData.Status = "keep"
+    file.RespData.Status = "keep"
     var flag = map[int] interface{}{}
 
 	for {
@@ -117,11 +130,12 @@ func Progress(file *File, dest *os.File, fileData io.Reader) (written int64, err
 			}
 			p = float32(written) / float32(file.Size) * 100
 
+            // Response 5% -> 10% -> 15% -> 20% ...... 95% -> 100%
             pp := int(p)
             if pp >= 5 && pp % 5 == 0 {
                 if flag[pp] != true {
-                    file.UrlData.Progress = pp
-                    websocket.JSON.Send(file.Ws, file.UrlData)
+                    file.RespData.Progress = pp
+                    websocket.JSON.Send(file.Ws, file.RespData)
                     fmt.Printf("%s progress: %v%%\n", file.Name, int(p))
                 }
                 flag[pp] = true
@@ -144,28 +158,4 @@ func Progress(file *File, dest *os.File, fileData io.Reader) (written int64, err
 		}
 	}
 	return written, err
-}
-
-func HandleDownload(file *File) {
-	Download(file)
-	if file.Err == nil {
-		file.Msg = fmt.Sprintf("%s (%d bytes) has been download! Spend time : %s", file.Name, file.Size, file.SpendTime)
-		file.ConnStatus = true
-	} else {
-		file.Msg = fmt.Sprintf("  **Fail to connect %s", file.Name)
-        file.Err = errors.New(fmt.Sprintf("  **Fail to connect %s", file.Name))
-	}
-}
-
-func DownloadFile(url string, storagePath string, ws *websocket.Conn, rec *UrlData, ch chan File) {
-    urlSplit := strings.Split(url, "/")
-    file := DefaultFile
-    file.Url = url
-    file.Name = urlSplit[len(urlSplit)-1]
-    file.Path = storagePath + string(os.PathSeparator) + file.Name
-    file.Ws = ws
-    file.UrlData = rec
-    file.UrlData.FilePath = file.Path
-    HandleDownload(&file)
-    ch <- file
 }

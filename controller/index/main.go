@@ -107,9 +107,9 @@ func Home(w http.ResponseWriter, r *http.Request) {
 func Download(ws *websocket.Conn) {
 
     var err error
-    var rec download.UrlData
+    var rec download.RespData
     var file download.File
-    ch := make(chan download.File)
+    ch := make(chan int)
 
     // Full CPU Running
     runtime.GOMAXPROCS(runtime.NumCPU())
@@ -117,9 +117,9 @@ func Download(ws *websocket.Conn) {
     for {
         err = websocket.JSON.Receive(ws, &rec)
         if err != nil {
-            var reply download.UrlData
+            var reply download.RespData
             reply.Status = "fail"
-            reply.ErrMsg = "Not JSON format"
+            reply.Msg = "Not JSON format"
             websocket.JSON.Send(ws, reply)
             break
         }
@@ -127,23 +127,21 @@ func Download(ws *websocket.Conn) {
         storagePath, err2 := osmod.GetStoragePath()
         if err2 != nil {
             rec.Status = "fail"
-            rec.ErrMsg = "Storage path doesn't exist."
+            rec.Msg = "Storage path doesn't exist."
             websocket.JSON.Send(ws, rec)
             break
         }
 
         go download.DownloadFile(rec.Url, storagePath, ws, &rec, ch);
-        file = <-ch
-        if  file.Err != nil {
+        errNum := <-ch
+        if  errNum == 0 {
             rec.Status = "fail"
-            rec.ErrMsg = file.Err.Error()
             os.Remove(file.Path)
-            fmt.Println(file.Msg)
+            fmt.Println(rec.Msg)
         } else {
             // Success
             rec.Status = "ok"
-            rec.FilePath = file.UrlData.FilePath
-            fmt.Println(file.Msg)
+            fmt.Println(rec.Msg)
         }
 
         if err = websocket.JSON.Send(ws, rec); err != nil {

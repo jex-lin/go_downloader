@@ -18,7 +18,7 @@ $(document).ready(function(){
                 Success: function(response) {
                     var res = JSON.parse(response);
                     if (res["Status"] == "fail") {
-                        alert(res["ErrMsg"]);
+                        alert(res["Msg"]);
                     }
                 }
             })
