@@ -107,7 +107,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
 func Download(ws *websocket.Conn) {
 
     var err error
-    var rec download.RespData
+    var rec download.WsRespData
     var file download.File
     ch := make(chan int)
 
@@ -117,7 +117,7 @@ func Download(ws *websocket.Conn) {
     for {
         err = websocket.JSON.Receive(ws, &rec)
         if err != nil {
-            var reply download.RespData
+            var reply download.WsRespData
             reply.Status = "fail"
             reply.Msg = "Not JSON format"
             websocket.JSON.Send(ws, reply)
@@ -137,12 +137,11 @@ func Download(ws *websocket.Conn) {
         if  errNum == 0 {
             rec.Status = "fail"
             os.Remove(file.Path)
-            fmt.Println(rec.Msg)
         } else {
             // Success
             rec.Status = "ok"
-            fmt.Println(rec.Msg)
         }
+        fmt.Println(rec.Msg)
 
         if err = websocket.JSON.Send(ws, rec); err == nil {
             // If success then close connection.

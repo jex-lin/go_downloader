@@ -13,11 +13,7 @@ import (
     "code.google.com/p/go.net/websocket"
 )
 
-const (
-	tryCountLimit int           = 1
-)
-
-type RespData struct {
+type WsRespData struct {
     Target string
     Url string
     Progress int
@@ -33,8 +29,9 @@ type File struct {
     SpendTime  string
 	Path       string
 	ConnStatus bool
+    HttpResp   *http.Response
     Ws         *websocket.Conn
-    RespData    *RespData
+    WsRespData    *WsRespData
 }
 
 var DefaultFile = File{
@@ -42,35 +39,44 @@ var DefaultFile = File{
     SpendTime: "0s",
 }
 
-func (file *File) Download () (err error){
+func (file *File) GetHttpResp(url string) (err error) {
 	// Get data
-	resp, err := http.Get(file.Url)
+	resp, err := http.Get(url)
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		errMsg := fmt.Sprintf("server return non-200 status: %v", resp.Status)
 		err = errors.New(errMsg)
-		return
+        return
 	}
-	i, err := strconv.Atoi(resp.Header.Get("Content-Length"))
-	if err != nil {
-		return
-	}
-    fileSize := int64(i)
-	file.Size = fileSize
 
+    // Save length
+	i, err := strconv.Atoi(resp.Header.Get("Content-Length"))
+    file.Size = int64(i)
+    file.HttpResp = resp
+    return
+}
+
+func CheckHttpRange(url string) (has bool, err error){
+    resp, err := http.Get(url)
+    if err == nil {
+        if resp.Header.Get("Accept-Ranges") == "bytes" {
+            return true, nil
+        }
+    }
+    defer resp.Body.Close()
+    return false, err
+}
+
+func (file *File) Download () (err error){
     // If file already had been downloaded, don't do it again.
     isExistent, fileInfo := osmod.GetFileInfo(file.Path)
     if isExistent {
-        if fileSize == fileInfo.Size() {
-            file.Size = fileSize
+        if file.Size == fileInfo.Size() {
             return
         }
     }
-
-	var fileData io.Reader = resp.Body
 
 	// Create file
 	dest, err := os.Create(file.Path)
@@ -82,47 +88,55 @@ func (file *File) Download () (err error){
 	defer dest.Close()
 
 	// Progress
+    var ioReader io.Reader = file.HttpResp.Body
+	defer file.HttpResp.Body.Close()
 	startTime := time.Now()
-	_, err = file.progress(dest, fileData)
+	_, err = file.progress(dest, ioReader)
 	endTime := time.Now()
 
-	// Print result
+	// Output result
 	subTime := endTime.Sub(startTime)
-	file.Size = fileSize
 	file.SpendTime = subTime.String()
 	return
 }
 
-func DownloadFile(url string, storagePath string, ws *websocket.Conn, rec *RespData, ch chan int) {
+func DownloadFile(url string, storagePath string, ws *websocket.Conn, rec *WsRespData, ch chan int) {
     urlSplit := strings.Split(url, "/")
     file := DefaultFile
     file.Url = url
     file.Name = urlSplit[len(urlSplit)-1]
     file.Path = storagePath + string(os.PathSeparator) + file.Name
     file.Ws = ws
-    file.RespData = rec
-    file.RespData.FilePath = file.Path
+    file.WsRespData = rec
+    file.WsRespData.FilePath = file.Path
 
-	err := file.Download()
-	if err == nil {
-		file.RespData.Msg = fmt.Sprintf("%s (%d bytes) has been download! Spend time : %s", file.Name, file.Size, file.SpendTime)
-		file.ConnStatus = true
-        ch <- 1
-	} else {
-		file.RespData.Msg = fmt.Sprintf("  **Fail to connect %s", file.Name)
+    // Check connection OK
+    err := file.GetHttpResp(url)
+    if err != nil {
+        file.WsRespData.Msg = err.Error()
         ch <- 0
-	}
+    } else {
+        err = file.Download()
+        if err == nil {
+            file.WsRespData.Msg = fmt.Sprintf("%s (%d bytes) has been download! Spend time : %s", file.Name, file.Size, file.SpendTime)
+            file.ConnStatus = true
+            ch <- 1
+        } else {
+            file.WsRespData.Msg = err.Error()
+            ch <- 0
+        }
+    }
 }
 
-func (file *File) progress(dest *os.File, fileData io.Reader) (written int64, err error) {
+func (file *File) progress(dest *os.File, ioReader io.Reader) (written int64, err error) {
 	var p float32
 	buf := make([]byte, 32*1024)
 
-    file.RespData.Status = "keep"
+    file.WsRespData.Status = "keep"
     var flag = map[int] interface{}{}
 
 	for {
-		nr, er := fileData.Read(buf)
+		nr, er := ioReader.Read(buf)
 		if nr > 0 {
 			nw, ew := dest.Write(buf[0:nr])
 			if nw > 0 {
@@ -134,8 +148,8 @@ func (file *File) progress(dest *os.File, fileData io.Reader) (written int64, er
             pp := int(p)
             if pp >= 5 && pp % 5 == 0 {
                 if flag[pp] != true {
-                    file.RespData.Progress = pp
-                    websocket.JSON.Send(file.Ws, file.RespData)
+                    file.WsRespData.Progress = pp
+                    websocket.JSON.Send(file.Ws, file.WsRespData)
                     fmt.Printf("%s progress: %v%%\n", file.Name, int(p))
                 }
                 flag[pp] = true
