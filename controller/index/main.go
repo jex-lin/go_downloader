@@ -35,7 +35,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
             shutdownValue, _ := strconv.Atoi(shutdown)
             if shutdownValue == 1 {
                 os.Exit(0)
-            }    
+            }
         }
 
         storagePath := strings.TrimSpace(r.FormValue("storagePath"))
@@ -134,7 +134,6 @@ func Download(ws *websocket.Conn) {
 
         go download.DownloadFile(rec.Url, storagePath, ws, &rec, ch);
         file = <-ch
-        fmt.Println(file)
         if  file.Err != nil {
             rec.Status = "fail"
             rec.ErrMsg = file.Err.Error()
@@ -162,7 +161,7 @@ func PlayVideo(w http.ResponseWriter, r *http.Request) {
     if r.Method == "POST" {
         ffmpegPath := filepath.Clean(strings.TrimSpace(r.FormValue("FFmpegPath")))
         filePath := filepath.Clean(strings.TrimSpace(r.FormValue("FilePath")))
-        
+
         if ! osmod.FileExists(ffmpegPath) || ! osmod.FileExists(filePath) {
             output["Status"] = "fail"
             output["ErrMsg"] = "FFmpeg path or file path doesn't exist."
