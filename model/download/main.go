@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+    "net/url"
 	"net/http"
 	"os"
 	"strconv"
@@ -11,6 +12,10 @@ import (
 	"time"
     "go_downloader/model/osmod"
     "code.google.com/p/go.net/websocket"
+)
+
+const (
+    MulDowAtLeastSize = 60 * 1024 * 1024
 )
 
 type WsRespData struct {
@@ -37,95 +42,6 @@ type File struct {
 var DefaultFile = File{
 	ConnStatus: false,
     SpendTime: "0s",
-}
-
-func (file *File) GetHttpResp(url string) (err error) {
-	// Get data
-	resp, err := http.Get(url)
-	if err != nil {
-		return
-	}
-	if resp.StatusCode != http.StatusOK {
-		errMsg := fmt.Sprintf("server return non-200 status: %v", resp.Status)
-		err = errors.New(errMsg)
-        return
-	}
-
-    // Save length
-	i, err := strconv.Atoi(resp.Header.Get("Content-Length"))
-    file.Size = int64(i)
-    file.HttpResp = resp
-    return
-}
-
-func CheckHttpRange(url string) (has bool, err error){
-    resp, err := http.Get(url)
-    if err == nil {
-        if resp.Header.Get("Accept-Ranges") == "bytes" {
-            return true, nil
-        }
-    }
-    defer resp.Body.Close()
-    return false, err
-}
-
-func (file *File) Download () (err error){
-    // If file already had been downloaded, don't do it again.
-    isExistent, fileInfo := osmod.GetFileInfo(file.Path)
-    if isExistent {
-        if file.Size == fileInfo.Size() {
-            return
-        }
-    }
-
-	// Create file
-	dest, err := os.Create(file.Path)
-	if err != nil {
-		errMsg := fmt.Sprintf("Can't create %s : %v", file.Path, err)
-		err = errors.New(errMsg)
-		return
-	}
-	defer dest.Close()
-
-	// Progress
-    var ioReader io.Reader = file.HttpResp.Body
-	defer file.HttpResp.Body.Close()
-	startTime := time.Now()
-	_, err = file.progress(dest, ioReader)
-	endTime := time.Now()
-
-	// Output result
-	subTime := endTime.Sub(startTime)
-	file.SpendTime = subTime.String()
-	return
-}
-
-func DownloadFile(url string, storagePath string, ws *websocket.Conn, rec *WsRespData, ch chan int) {
-    urlSplit := strings.Split(url, "/")
-    file := DefaultFile
-    file.Url = url
-    file.Name = urlSplit[len(urlSplit)-1]
-    file.Path = storagePath + string(os.PathSeparator) + file.Name
-    file.Ws = ws
-    file.WsRespData = rec
-    file.WsRespData.FilePath = file.Path
-
-    // Check connection OK
-    err := file.GetHttpResp(url)
-    if err != nil {
-        file.WsRespData.Msg = err.Error()
-        ch <- 0
-    } else {
-        err = file.Download()
-        if err == nil {
-            file.WsRespData.Msg = fmt.Sprintf("%s (%d bytes) has been download! Spend time : %s", file.Name, file.Size, file.SpendTime)
-            file.ConnStatus = true
-            ch <- 1
-        } else {
-            file.WsRespData.Msg = err.Error()
-            ch <- 0
-        }
-    }
 }
 
 func (file *File) progress(dest *os.File, ioReader io.Reader) (written int64, err error) {
@@ -172,4 +88,189 @@ func (file *File) progress(dest *os.File, ioReader io.Reader) (written int64, er
 		}
 	}
 	return written, err
+}
+
+// Get http status
+func (file *File) GetHttpResp(url string) (err error) {
+	// Get data
+	resp, err := http.Get(url)
+	if err != nil {
+		return
+	}
+	if resp.StatusCode != http.StatusOK {
+		errMsg := fmt.Sprintf("server return non-200 status: %v", resp.Status)
+		err = errors.New(errMsg)
+        return
+	}
+
+    // Save length
+	i, err := strconv.Atoi(resp.Header.Get("Content-Length"))
+    file.Size = int64(i)
+    file.HttpResp = resp
+    return
+}
+
+// Checking header support Accept-ranges or not.
+func (file *File) CheckHttpRange() bool {
+    if file.HttpResp.Header.Get("Accept-Ranges") == "bytes" {
+        return true
+    }
+    return false
+}
+
+// Check file already has been downloaded or not.
+func (file *File) FileHasDownload () bool {
+    isExistent, fileInfo := osmod.GetFileInfo(file.Path)
+    if isExistent {
+        if file.Size == fileInfo.Size() {
+            return true
+        }
+    }
+    return false
+}
+
+// Not support Accept-ranges
+func (file *File) SingleDownload () (err error){
+	// Create file
+	dest, err := os.Create(file.Path)
+	if err != nil {
+		errMsg := fmt.Sprintf("Can't create %s : %v", file.Path, err)
+		err = errors.New(errMsg)
+		return
+	}
+	defer dest.Close()
+
+	// Progress
+    var ioReader io.Reader = file.HttpResp.Body
+	defer file.HttpResp.Body.Close()
+	startTime := time.Now()
+	_, err = file.progress(dest, ioReader)
+	endTime := time.Now()
+
+	// Output result
+	durTime := endTime.Sub(startTime)
+	file.SpendTime = durTime.String()
+	return
+}
+
+// support Accept-ranges
+func (file *File) MultiDownload() (err error) {
+    // If file is too small, use single download
+    if file.Size < MulDowAtLeastSize {
+        err = file.SingleDownload()
+        return
+    }
+
+	// Create file
+	dest, err := os.Create(file.Path)
+	if err != nil {
+		errMsg := fmt.Sprintf("Can't create %s : %v", file.Path, err)
+		err = errors.New(errMsg)
+		return
+	}
+	defer dest.Close()
+
+	// Output result
+
+    sectionCount := int64(5)
+    fmt.Println("total: " + strconv.Itoa(int(file.Size)))
+    ReqRangeSize := int64(file.Size / sectionCount)
+    var start, end int64
+    var ioReader io.Reader
+    var written int64
+    for i := int64(1); i <= sectionCount; i++ {
+        if i == sectionCount {
+            end = file.Size
+        } else {
+            end = start + ReqRangeSize
+        }
+        //fmt.Println(fmt.Sprintf("%d  ->  %d", start, end-1))
+        ioReader, err = file.ReqHttpRange(start, end-1)
+        fmt.Println(fmt.Sprintf("%d  ->  %d", start, end-1))
+        if err != nil { return }
+        written, err = file.RangeWrite(dest, ioReader, start)
+        if err != nil { return }
+        fmt.Println(written)
+        start = end
+    }
+    os.Exit(0)
+
+    return
+}
+
+func (file *File) ReqHttpRange (start int64, end int64) (respBody io.Reader,err error) {
+    var req http.Request
+    header := http.Header{}
+    header.Set("Range", "bytes=" + strconv.Itoa(int(start)) + "-" + strconv.Itoa(int(end)))
+    req.Header = header
+    req.URL, _ = url.Parse(file.Url)
+    resp, err := http.DefaultClient.Do(&req)
+    if err != nil {
+        return
+    }
+	//defer file.HttpResp.Body.Close()
+    return resp.Body, nil
+}
+
+func (file *File) RangeWrite (dest *os.File, ioReader io.Reader, start int64) (written int64, err error){
+    buf := make([]byte, 32*1024)
+    for {
+        nr, er := ioReader.Read(buf)
+        if nr > 0 {
+            nw, ew := dest.WriteAt(buf[0:nr], start)
+            start = int64(nw) + start
+            if nw > 0 {
+                written += int64(nw)
+            }
+            if ew != nil {
+                err = ew
+            }
+            if nr != nw {
+                err = errors.New("short write")
+            }
+        }
+        if er != nil {
+            if er.Error() == "EOF" {
+                //Successfully finish downloading
+                return written, nil
+            }
+            err = er
+            break
+        }
+    }
+    return
+}
+
+func DownloadFile(url string, storagePath string, ws *websocket.Conn, rec *WsRespData, ch chan int) {
+    urlSplit := strings.Split(url, "/")
+    file := DefaultFile
+    file.Url = url
+    file.Name = urlSplit[len(urlSplit)-1]
+    file.Path = storagePath + string(os.PathSeparator) + file.Name
+    file.Ws = ws
+    file.WsRespData = rec
+    file.WsRespData.FilePath = file.Path
+
+    // Check connection OK
+    err := file.GetHttpResp(url)
+    if err != nil {
+        file.WsRespData.Msg = err.Error()
+        ch <- 0
+    } else {
+        if ! file.FileHasDownload() {
+            if file.CheckHttpRange() {
+                err = file.MultiDownload()
+            } else {
+                err = file.SingleDownload()
+            }
+        }
+        if err == nil {
+            file.WsRespData.Msg = fmt.Sprintf("%s (%d bytes) has been download! Spend time : %s", file.Name, file.Size, file.SpendTime)
+            file.ConnStatus = true
+            ch <- 1
+        } else {
+            file.WsRespData.Msg = err.Error()
+            ch <- 0
+        }
+    }
 }
