@@ -35,7 +35,7 @@ $(document).ready(function(){
         };
 
         if (typeof ws[num] === "undefined") {
-            ws[num] = new WebSocket("ws://192.168.1.67:9090/download/");
+            ws[num] = new WebSocket("ws://" + window.location.host + "/download/");
             connect_websocket(ws[num]);
         }
         $(this).addClass("hide");
