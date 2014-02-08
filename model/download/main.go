@@ -15,7 +15,7 @@ import (
 )
 
 const (
-    MulDowAtLeastSize = 1 * 1024 * 1024
+    MulDowAtLeastSize = 1000 * 1024 * 1024
 )
 
 type WsRespData struct {
@@ -101,6 +101,10 @@ func (file *File) GetHttpResp(url string) (err error) {
 	if err != nil {
 		return
 	}
+    if resp.Close {
+		err = errors.New("Response has closed")
+        return
+    }
 	if resp.StatusCode != http.StatusOK {
 		errMsg := fmt.Sprintf("server return non-200 status: %v", resp.Status)
 		err = errors.New(errMsg)
@@ -175,7 +179,7 @@ func (file *File) MultiDownload() (err error) {
 	defer dest.Close()
 
     var start, end int64
-    sectionCount := int64(5)
+    sectionCount := int64(2)
     chMulDow := make(chan int64, sectionCount)
     fmt.Println("total: " + strconv.Itoa(int(file.Size)))
     ReqRangeSize := int64(file.Size / sectionCount)
@@ -210,17 +214,27 @@ func (file *File) ReqHttpRange (start int64, end int64) (respBody io.Reader,err 
     req.Header = header
     req.Method = "GET"              // Must, prevent 303
     req.URL, _ = url.Parse(file.Url)
-    resp, err := http.DefaultClient.Do(&req)
-    if err != nil {
-        return
+    for {
+        resp, err := http.DefaultClient.Do(&req)
+        if err != nil {
+            return nil, err
+        }
+        fmt.Printf("multi header : ")
+        fmt.Println(resp.Header)
+        fmt.Printf("multi body :")
+        fmt.Println(resp.Body)
+        if resp.Close {
+            continue
+        }
+        if resp.Header.Get("Accept-Ranges") == "bytes" {
+            fmt.Println("multi support range")
+        } else {
+            fmt.Println("multi not support range")
+            //return nil, errors.New("multi not support range")
+        }
+        return resp.Body, nil
     }
-    if resp.Header.Get("Accept-Ranges") == "bytes" {
-        fmt.Println("support ranges")
-    } else {
-        // Do something
-        fmt.Println("not support ranges")
-    }
-    return resp.Body, nil
+    return
 }
 
 func (file *File) RangeWrite (dest *os.File, start int64, end int64, chMulDow chan int64, partNum int64) {
@@ -248,7 +262,7 @@ func (file *File) RangeWrite (dest *os.File, start int64, end int64, chMulDow ch
 
 			p = float32(written) / float32(reqRangeSize) * 100
             pp := int(p)
-            if pp >= 50 && pp % 50 == 0 {
+            if pp >= 25 && pp % 25 == 0 {
                 if flag[pp] != true {
                     //file.WsRespData.Progress = pp
                     //websocket.JSON.Send(file.Ws, file.WsRespData)
