@@ -15,7 +15,7 @@ import (
 )
 
 const (
-    MulDowAtLeastSize = 1 * 1024 * 1024
+    MulDowAtLeastSize = 100 * 1024 * 1024
 )
 
 type WsRespData struct {
@@ -79,8 +79,13 @@ func (file *File) progress(dest *os.File, ioReader io.Reader) (written int64, er
 		}
 		if er != nil {
             if er.Error() == "EOF" {
-                // Sucessfully finish downloading
-                return written, nil
+                if written == file.Size {
+                    // Sucessfully finish downloading
+                    return written, nil
+                } else {
+                    msg := fmt.Sprintf("%s written %d (unfinished)\n", file.Name, written)
+                    return written, errors.New(msg)
+                }
             }
 			err = er
 			break
@@ -184,7 +189,7 @@ func (file *File) MultiDownload() (err error) {
             end = start + ReqRangeSize
         }
         //fmt.Println(fmt.Sprintf("%d  ->  %d", start, end-1))
-        go file.RangeWrite(dest, start, end - 1, chMulDow, i)
+        go file.RangeWrite(dest, start, end, chMulDow, i)
         start = end
     }
     for i := int64(1); i <= sectionCount; i++ {
@@ -242,7 +247,7 @@ func (file *File) RangeWrite (dest *os.File, start int64, end int64, chMulDow ch
                 if flag[pp] != true {
                     //file.WsRespData.Progress = pp
                     //websocket.JSON.Send(file.Ws, file.WsRespData)
-                    //fmt.Printf("%s part%d progress: %v%%\n", file.Name, partNum, int(p))
+                    fmt.Printf("%s part%d progress: %v%%\n", file.Name, partNum, int(p))
                 }
                 flag[pp] = true
             }
@@ -250,9 +255,13 @@ func (file *File) RangeWrite (dest *os.File, start int64, end int64, chMulDow ch
         if er != nil {
             if er.Error() == "EOF" {
                 //Successfully finish downloading
-                fmt.Printf("part%d total size : %d\n", partNum, reqRangeSize)
-                fmt.Printf("part%d written  %d\n", partNum, written)
-                chMulDow <- written
+                if reqRangeSize == written {
+                    fmt.Printf("%s part%d written  %d\n", file.Name, partNum, written)
+                    chMulDow <- written
+                } else {
+                    fmt.Printf("%s part%d written  %d (unfinished)\n", file.Name, partNum, written)
+                    chMulDow <- -1
+                }
                 break
             }
             fmt.Printf("part%d downloading error : %s\n", partNum, er.Error())
