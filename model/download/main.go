@@ -15,7 +15,7 @@ import (
 )
 
 const (
-    MulDowAtLeastSize = 100 * 1024 * 1024
+    MulDowAtLeastSize = 1 * 1024 * 1024
 )
 
 type WsRespData struct {
@@ -174,7 +174,6 @@ func (file *File) MultiDownload() (err error) {
 	}
 	defer dest.Close()
 
-	// Output result
     var start, end int64
     sectionCount := int64(5)
     chMulDow := make(chan int64, sectionCount)
@@ -209,11 +208,17 @@ func (file *File) ReqHttpRange (start int64, end int64) (respBody io.Reader,err 
     header := http.Header{}
     header.Set("Range", "bytes=" + strconv.Itoa(int(start)) + "-" + strconv.Itoa(int(end)))
     req.Header = header
-    req.Method = "POST"
+    req.Method = "GET"              // Must, prevent 303
     req.URL, _ = url.Parse(file.Url)
     resp, err := http.DefaultClient.Do(&req)
     if err != nil {
         return
+    }
+    if resp.Header.Get("Accept-Ranges") == "bytes" {
+        fmt.Println("support ranges")
+    } else {
+        // Do something
+        fmt.Println("not support ranges")
     }
     return resp.Body, nil
 }
@@ -292,6 +297,7 @@ func DownloadFile(url string, storagePath string, ws *websocket.Conn, rec *WsRes
                 fmt.Println("Support http range")
                 err = file.MultiDownload()
             } else {
+                fmt.Println("Not support http range")
                 err = file.SingleDownload()
             }
         }
