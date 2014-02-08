@@ -15,7 +15,7 @@ import (
 )
 
 const (
-    MulDowAtLeastSize = 60 * 1024 * 1024
+    MulDowAtLeastSize = 1 * 1024 * 1024
 )
 
 type WsRespData struct {
@@ -58,8 +58,14 @@ func (file *File) progress(dest *os.File, ioReader io.Reader) (written int64, er
 			if nw > 0 {
 				written += int64(nw)
 			}
-			p = float32(written) / float32(file.Size) * 100
+			if ew != nil {
+				err = ew
+			}
+			if nr != nw {
+				err = errors.New("short write")
+			}
 
+			p = float32(written) / float32(file.Size) * 100
             // Response 5% -> 10% -> 15% -> 20% ...... 95% -> 100%
             pp := int(p)
             if pp >= 5 && pp % 5 == 0 {
@@ -70,13 +76,6 @@ func (file *File) progress(dest *os.File, ioReader io.Reader) (written int64, er
                 }
                 flag[pp] = true
             }
-
-			if ew != nil {
-				err = ew
-			}
-			if nr != nw {
-				err = errors.New("short write")
-			}
 		}
 		if er != nil {
             if er.Error() == "EOF" {
@@ -171,13 +170,13 @@ func (file *File) MultiDownload() (err error) {
 	defer dest.Close()
 
 	// Output result
-
+    var start, end int64
     sectionCount := int64(5)
+    chMulDow := make(chan int64, sectionCount)
     fmt.Println("total: " + strconv.Itoa(int(file.Size)))
     ReqRangeSize := int64(file.Size / sectionCount)
-    var start, end int64
-    var ioReader io.Reader
-    var written int64
+
+    startTime := time.Now()
     for i := int64(1); i <= sectionCount; i++ {
         if i == sectionCount {
             end = file.Size
@@ -185,16 +184,18 @@ func (file *File) MultiDownload() (err error) {
             end = start + ReqRangeSize
         }
         //fmt.Println(fmt.Sprintf("%d  ->  %d", start, end-1))
-        ioReader, err = file.ReqHttpRange(start, end-1)
-        fmt.Println(fmt.Sprintf("%d  ->  %d", start, end-1))
-        if err != nil { return }
-        written, err = file.RangeWrite(dest, ioReader, start)
-        if err != nil { return }
-        fmt.Println(written)
+        go file.RangeWrite(dest, start, end - 1, chMulDow, i)
         start = end
     }
-    os.Exit(0)
-
+    for i := int64(1); i <= sectionCount; i++ {
+        written := <-chMulDow
+        if written == -1 {
+            return errors.New("Multi downloading - range write error")
+        }
+    }
+    endTime := time.Now()
+    durTime := endTime.Sub(startTime)
+	file.SpendTime = durTime.String()
     return
 }
 
@@ -203,17 +204,23 @@ func (file *File) ReqHttpRange (start int64, end int64) (respBody io.Reader,err 
     header := http.Header{}
     header.Set("Range", "bytes=" + strconv.Itoa(int(start)) + "-" + strconv.Itoa(int(end)))
     req.Header = header
+    req.Method = "POST"
     req.URL, _ = url.Parse(file.Url)
     resp, err := http.DefaultClient.Do(&req)
     if err != nil {
         return
     }
-	//defer file.HttpResp.Body.Close()
     return resp.Body, nil
 }
 
-func (file *File) RangeWrite (dest *os.File, ioReader io.Reader, start int64) (written int64, err error){
-    buf := make([]byte, 32*1024)
+func (file *File) RangeWrite (dest *os.File, start int64, end int64, chMulDow chan int64, partNum int64) {
+    var written int64
+    var p float32
+    var flag = map[int] interface{}{}
+    ioReader, err := file.ReqHttpRange(start, end - 1)
+    reqRangeSize := end - start
+    if err != nil { return }
+    buf := make([]byte, 32 * 1024)
     for {
         nr, er := ioReader.Read(buf)
         if nr > 0 {
@@ -228,17 +235,31 @@ func (file *File) RangeWrite (dest *os.File, ioReader io.Reader, start int64) (w
             if nr != nw {
                 err = errors.New("short write")
             }
+
+			p = float32(written) / float32(reqRangeSize) * 100
+            pp := int(p)
+            if pp >= 50 && pp % 50 == 0 {
+                if flag[pp] != true {
+                    //file.WsRespData.Progress = pp
+                    //websocket.JSON.Send(file.Ws, file.WsRespData)
+                    //fmt.Printf("%s part%d progress: %v%%\n", file.Name, partNum, int(p))
+                }
+                flag[pp] = true
+            }
         }
         if er != nil {
             if er.Error() == "EOF" {
                 //Successfully finish downloading
-                return written, nil
+                fmt.Printf("part%d total size : %d\n", partNum, reqRangeSize)
+                fmt.Printf("part%d written  %d\n", partNum, written)
+                chMulDow <- written
+                break
             }
-            err = er
+            fmt.Printf("part%d downloading error : %s\n", partNum, er.Error())
+            chMulDow <- -1
             break
         }
     }
-    return
 }
 
 func DownloadFile(url string, storagePath string, ws *websocket.Conn, rec *WsRespData, ch chan int) {
@@ -259,6 +280,7 @@ func DownloadFile(url string, storagePath string, ws *websocket.Conn, rec *WsRes
     } else {
         if ! file.FileHasDownload() {
             if file.CheckHttpRange() {
+                fmt.Println("Support http range")
                 err = file.MultiDownload()
             } else {
                 err = file.SingleDownload()

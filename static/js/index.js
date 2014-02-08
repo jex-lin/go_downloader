@@ -50,7 +50,7 @@ $(document).ready(function(){
                 console.log("1" + ws[num].readyState);
                 ws[num].send(JSON.stringify(data))
             } else {
-                alert("Connect fail : ws.readyState isn't 1.");
+                alert("Can't connect.");
             }
         }, 300);
         console.log("2" + ws[num].readyState);
