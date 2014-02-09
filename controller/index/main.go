@@ -14,6 +14,7 @@ import (
     "os/exec"
     "runtime"
     "encoding/json"
+    "bytes"
 )
 
 // Static file (img, js, css)
@@ -22,7 +23,7 @@ func Static(w http.ResponseWriter, r *http.Request) {
 }
 
 func Home(w http.ResponseWriter, r *http.Request) {
-    // Prepare data
+
     var data = map[string] interface{}{}
 
     // Receive post
@@ -34,18 +35,19 @@ func Home(w http.ResponseWriter, r *http.Request) {
             shutdownValue, _ := strconv.Atoi(shutdown)
             if shutdownValue == 1 {
                 os.Exit(0)
-            }    
+            }
         }
-        
 
         storagePath := strings.TrimSpace(r.FormValue("storagePath"))
         ffmpegPath := strings.TrimSpace(r.FormValue("ffmpegPath"))
-        storagePath = filepath.Clean(storagePath)
-        data["storagePath"] = storagePath
-        if osmod.SetStoragePath(storagePath) {
-            data["checkStoragePath"] = true
-        } else {
-            data["checkStoragePath"] = false
+        if storagePath != "" {
+            storagePath = filepath.Clean(storagePath)
+            data["storagePath"] = storagePath
+            if osmod.SetStoragePath(storagePath) {
+                data["checkStoragePath"] = true
+            } else {
+                data["checkStoragePath"] = false
+            }
         }
         if ffmpegPath != "" {
             ffmpegPath = filepath.Clean(ffmpegPath)
@@ -53,11 +55,28 @@ func Home(w http.ResponseWriter, r *http.Request) {
             if osmod.FileExists(ffmpegPath) {
                 data["checkFFmpegPath"] = true
             } else {
-
                 data["checkFFmpegPath"] = false
             }
         }
+    } else {
+        // Default data
+        currentPath, err := os.Getwd()
+        if err != nil {
+            fmt.Println(err)
+            currentPath = ""
+        }
+        if currentPath != "" {
+            // Storage path
+            osmod.SetStoragePath(currentPath)
+            data["checkStoragePath"] = true
+            data["storagePath"] = currentPath
+            // ffplay path
+            ffplayPath := currentPath + string(os.PathSeparator) + "ffplay.exe"
+            data["checkFFmpegPath"] = true
+            data["ffmpegPath"] = ffplayPath
+        }
     }
+
     if runtime.GOOS == "windows" {
         data["isWindows"] = true
     }
@@ -68,8 +87,19 @@ func Home(w http.ResponseWriter, r *http.Request) {
     t, _ := template.ParseFiles(
         tmplPath + "header.tmpl",
         indexPath + "body.html",
+        tmplPath + "index/urlItem.tmpl",
         tmplPath + "footer.tmpl",
     )
+
+    // For loop url item
+    var tmplBuf bytes.Buffer
+    var nums = map[string] interface{}{}
+    for num := 1; num <= 10; num++ {
+        nums["num"] = num
+        t.ExecuteTemplate(&tmplBuf, "urlItem", nums)
+    }
+    data["urlItem"] = template.HTML(tmplBuf.String())
+
     t.ExecuteTemplate(w, "body", data)
 	t.Execute(w, nil)
 }
@@ -77,15 +107,19 @@ func Home(w http.ResponseWriter, r *http.Request) {
 func Download(ws *websocket.Conn) {
 
     var err error
-    var rec download.UrlData
+    var rec download.WsRespData
     var file download.File
+    ch := make(chan int)
+
+    // Full CPU Running
+    runtime.GOMAXPROCS(runtime.NumCPU())
 
     for {
         err = websocket.JSON.Receive(ws, &rec)
         if err != nil {
-            var reply download.UrlData
+            var reply download.WsRespData
             reply.Status = "fail"
-            reply.ErrMsg = "Not JSON format"
+            reply.Msg = "Not JSON format"
             websocket.JSON.Send(ws, reply)
             break
         }
@@ -93,22 +127,29 @@ func Download(ws *websocket.Conn) {
         storagePath, err2 := osmod.GetStoragePath()
         if err2 != nil {
             rec.Status = "fail"
-            rec.ErrMsg = "Storage path doesn't exist."
+            rec.Msg = "Storage path doesn't exist."
             websocket.JSON.Send(ws, rec)
             break
         }
 
-        file = download.DownloadFile(rec.Url, storagePath, ws, &rec);
-        if  file.Err != nil {
+        go download.DownloadFile(rec.Url, storagePath, ws, &rec, ch);
+        errNum := <-ch
+        if  errNum == 0 {
             rec.Status = "fail"
-            rec.ErrMsg = file.Err.Error()
+            os.Remove(file.Path)
         } else {
             // Success
             rec.Status = "ok"
-            rec.FilePath = file.UrlData.FilePath
         }
+        fmt.Println(rec.Msg)
 
-        if err = websocket.JSON.Send(ws, rec); err != nil {
+        if err = websocket.JSON.Send(ws, rec); err == nil {
+            // If success then close connection.
+            if errNum == 1 {
+                fmt.Println("Close websocket connection.")
+                ws.Close()
+            }
+        } else {
             fmt.Println("Can't send")
             break
         }
@@ -123,7 +164,7 @@ func PlayVideo(w http.ResponseWriter, r *http.Request) {
     if r.Method == "POST" {
         ffmpegPath := filepath.Clean(strings.TrimSpace(r.FormValue("FFmpegPath")))
         filePath := filepath.Clean(strings.TrimSpace(r.FormValue("FilePath")))
-        
+
         if ! osmod.FileExists(ffmpegPath) || ! osmod.FileExists(filePath) {
             output["Status"] = "fail"
             output["ErrMsg"] = "FFmpeg path or file path doesn't exist."

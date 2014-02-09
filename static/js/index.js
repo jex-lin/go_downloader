@@ -1,6 +1,5 @@
 $(document).ready(function(){
-    connect_websocket();
-
+    var ws = {};
     $("#shutdown").click(function(){
         $.ajax({
             url: '/',
@@ -9,7 +8,8 @@ $(document).ready(function(){
         })
         location.reload();
     })
-    $("#url1-play-container").click(function(){
+    $(".url-play-container").click(function(){
+        num = $(this).data("num");
         if ($("#ffmpeg-path").val() != "") {
             $.ajax({
                 url: '/playVideo/',
@@ -18,7 +18,7 @@ $(document).ready(function(){
                 Success: function(response) {
                     var res = JSON.parse(response);
                     if (res["Status"] == "fail") {
-                        alert(res["ErrMsg"]);
+                        alert(res["Msg"]);
                     }
                 }
             })
@@ -27,17 +27,33 @@ $(document).ready(function(){
             $("#ffmpeg-path").focus();
         }
     })
-    $("#url1-download-container").click(function() {
+    $(".url-download-container").click(function() {
+        num = $(this).data("num");
         var data = {
-            "Target" : "url1",
-            "Url"    : $("#url1").val()
+            "Target" : "#url-" + num ,
+            "Url"    : $("#url-" + num).val()
         };
-        ws.send(JSON.stringify(data));
 
+        if (typeof ws[num] === "undefined") {
+            ws[num] = new WebSocket("ws://" + window.location.host + "/download/");
+            connect_websocket(ws[num]);
+        }
         $(this).addClass("hide");
-        $("#url1-wait-container").removeClass("hide");
-        $("#url1-progress-container").removeClass("hide");
-        set_list_item_warning($("#url1-list-group-item"))
+        $("#url-" + num + "-wait-container").removeClass("hide");
+        $("#url-" + num + "-progress-container").removeClass("hide");
+        set_list_item_warning($("#url-" + num + "-list-group-item"))
+
+        // 0->connecting  1->open 2->closing 3->closed
+        console.log("0" + ws[num].readyState);
+        setTimeout(function(){
+            if (ws[num].readyState === 1) {
+                console.log("1" + ws[num].readyState);
+                ws[num].send(JSON.stringify(data))
+            } else {
+                alert("Can't connect.");
+            }
+        }, 300);
+        console.log("2" + ws[num].readyState);
     })
 })
 
@@ -62,9 +78,7 @@ function set_list_item_error($this) {
     $this.addClass("list-group-item-danger");
 }
 
-function connect_websocket() {
-    ws = new WebSocket("ws://127.0.0.1:9090/download/");
-
+function connect_websocket(ws) {
     // First connect
     ws.onopen = function() {
         console.log("[onopen] connect ws uri.");
@@ -73,42 +87,41 @@ function connect_websocket() {
     // Sending from server
     ws.onmessage = function(e) {
         var res = JSON.parse(e.data);
-        if (res["Target"] == "url1") {
-            if (res["Status"] == "ok") {
-                setTimeout(function(){
-                    $("#url1-download-container").addClass("hide");
-                    $("#url1-progress-container").addClass("hide");
-                    $("#url1-status-ok").removeClass("hide");
-                    $("#url1-status-fail").addClass("hide");
-                    $("#url1-wait-container").addClass("hide");
-                    $("#url1-play-container").removeClass("hide");
-                    $("#url1").attr("disabled", "disabled");
-                    set_list_item_success($("#url1-list-group-item"));
-                    if ($("#url1-play-container").data("filepath") != "undefined") {
-                        $("#url1-play-container").attr("data-filepath", res["FilePath"]);
-                    }
-                }, 1000);
-            } else if (res["Status"] == "keep") {
-                if ($("#url1-play-container").hasClass("hide")) {
-                    $("#url1-play-container").attr("data-filepath", res["FilePath"]);
-                    $("#url1-play-container").removeClass("hide");
+        if (res["Status"] == "ok") {
+            setTimeout(function(){
+                $(res["Target"] + "-download-container").addClass("hide");
+                $(res["Target"] + "-progress-container").addClass("hide");
+                $(res["Target"] + "-status-ok").removeClass("hide");
+                $(res["Target"] + "-status-fail").addClass("hide");
+                $(res["Target"] + "-wait-container").addClass("hide");
+                $(res["Target"] + "-play-container").removeClass("hide");
+                $(res["Target"] + "").attr("disabled", "disabled");
+                set_list_item_success($(res["Target"] + "-list-group-item"));
+                if ($(res["Target"] + "-play-container").data("filepath") != "undefined") {
+                    $(res["Target"] + "-play-container").attr("data-filepath", res["FilePath"]);
                 }
-                $("#url1-progress-bar").css("width", res["Progress"]+"%");
-            } else if (res["Status"] == "fail") {
-                $("#url1-play-container").addClass("hide");
-                $("#url1-wait-container").addClass("hide");
-                $("#url1-download-container").removeClass("hide");
-                $("#url1-progress-container").addClass("hide");
-                $("#url1-status-ok").addClass("hide");
-                $("#url1-status-fail").removeClass("hide");
-                set_list_item_error($("#url1-list-group-item"));
+            }, 1000);
+        } else if (res["Status"] == "keep") {
+            if ($(res["Target"] + "-play-container").hasClass("hide")) {
+                $(res["Target"] + "-play-container").attr("data-filepath", res["FilePath"]);
+                $(res["Target"] + "-play-container").removeClass("hide");
             }
+            $(res["Target"] + "-progress-bar").css("width", res["Progress"]+"%");
+        } else if (res["Status"] == "fail") {
+            $(res["Target"] + "-play-container").addClass("hide");
+            $(res["Target"] + "-wait-container").addClass("hide");
+            $(res["Target"] + "-download-container").removeClass("hide");
+            $(res["Target"] + "-progress-container").addClass("hide");
+            $(res["Target"] + "-status-ok").addClass("hide");
+            $(res["Target"] + "-status-fail").removeClass("hide");
+            set_list_item_error($(res["Target"] + "-list-group-item"));
         }
     }
 
     // Server close connection
     ws.onclose = function(e) {
         console.log("[onclose] connection closed (" + e.code + ")");
+        delete ws;
     }
 
     // Occur error
