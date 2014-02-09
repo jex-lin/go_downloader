@@ -40,7 +40,7 @@ $(document).ready(function(){
         }
         $(this).addClass("hide");
         $("#url-" + num + "-wait-container").removeClass("hide");
-        $("#url-" + num + "-progress-container").removeClass("hide");
+        $("#url-" + num + "-single-progress-container").removeClass("hide");
         set_list_item_warning($("#url-" + num + "-list-group-item"))
 
         // 0->connecting  1->open 2->closing 3->closed
@@ -90,7 +90,7 @@ function connect_websocket(ws) {
         if (res["Status"] == "ok") {
             setTimeout(function(){
                 $(res["Target"] + "-download-container").addClass("hide");
-                $(res["Target"] + "-progress-container").addClass("hide");
+                $(res["Target"] + "-" + res["SingleOrMulti"]  + "-progress-container").addClass("hide");
                 $(res["Target"] + "-status-ok").removeClass("hide");
                 $(res["Target"] + "-status-fail").addClass("hide");
                 $(res["Target"] + "-wait-container").addClass("hide");
@@ -106,12 +106,12 @@ function connect_websocket(ws) {
                 $(res["Target"] + "-play-container").attr("data-filepath", res["FilePath"]);
                 $(res["Target"] + "-play-container").removeClass("hide");
             }
-            $(res["Target"] + "-progress-bar").css("width", res["Progress"]+"%");
+            $(res["Target"] + "-" + res["SingleOrMulti"] + "-progress-bar").css("width", res["Progress"]+"%");
         } else if (res["Status"] == "fail") {
             $(res["Target"] + "-play-container").addClass("hide");
             $(res["Target"] + "-wait-container").addClass("hide");
             $(res["Target"] + "-download-container").removeClass("hide");
-            $(res["Target"] + "-progress-container").addClass("hide");
+            $(res["Target"] + "-" + res["SingleOrMulti"]  + "-progress-container").addClass("hide");
             $(res["Target"] + "-status-ok").addClass("hide");
             $(res["Target"] + "-status-fail").removeClass("hide");
             set_list_item_error($(res["Target"] + "-list-group-item"));

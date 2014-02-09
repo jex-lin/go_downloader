@@ -15,7 +15,8 @@ import (
 )
 
 const (
-    MulDowAtLeastSize = 1000 * 1024 * 1024
+    MulDowAtLeastSize = 1 * 1024 * 1024
+    MultiSectionDowCount = int64(5)
 )
 
 type WsRespData struct {
@@ -23,6 +24,8 @@ type WsRespData struct {
     Url string
     Progress int
     Status string
+    SingleOrMulti string
+    PartNum int64
     Msg string
     FilePath string
 }
@@ -139,6 +142,7 @@ func (file *File) FileHasDownload () bool {
 
 // Not support Accept-ranges
 func (file *File) SingleDownload () (err error){
+    file.WsRespData.SingleOrMulti = "single"
 	// Create file
 	dest, err := os.Create(file.Path)
 	if err != nil {
@@ -163,11 +167,7 @@ func (file *File) SingleDownload () (err error){
 
 // support Accept-ranges
 func (file *File) MultiDownload() (err error) {
-    // If file is too small, use single download
-    if file.Size < MulDowAtLeastSize {
-        err = file.SingleDownload()
-        return
-    }
+    file.WsRespData.SingleOrMulti = "multi"
 
 	// Create file
 	dest, err := os.Create(file.Path)
@@ -179,14 +179,13 @@ func (file *File) MultiDownload() (err error) {
 	defer dest.Close()
 
     var start, end int64
-    sectionCount := int64(2)
-    chMulDow := make(chan int64, sectionCount)
+    chMulDow := make(chan int64, MultiSectionDowCount)
     fmt.Println("total: " + strconv.Itoa(int(file.Size)))
-    ReqRangeSize := int64(file.Size / sectionCount)
+    ReqRangeSize := int64(file.Size / MultiSectionDowCount)
 
     startTime := time.Now()
-    for i := int64(1); i <= sectionCount; i++ {
-        if i == sectionCount {
+    for i := int64(1); i <= MultiSectionDowCount; i++ {
+        if i == MultiSectionDowCount {
             end = file.Size
         } else {
             end = start + ReqRangeSize
@@ -195,7 +194,7 @@ func (file *File) MultiDownload() (err error) {
         go file.RangeWrite(dest, start, end, chMulDow, i)
         start = end
     }
-    for i := int64(1); i <= sectionCount; i++ {
+    for i := int64(1); i <= MultiSectionDowCount; i++ {
         written := <-chMulDow
         if written == -1 {
             return errors.New("Multi downloading - range write error")
@@ -219,10 +218,10 @@ func (file *File) ReqHttpRange (start int64, end int64) (respBody io.Reader,err 
         if err != nil {
             return nil, err
         }
-        fmt.Printf("multi header : ")
-        fmt.Println(resp.Header)
-        fmt.Printf("multi body :")
-        fmt.Println(resp.Body)
+        //fmt.Printf("multi header : ")
+        //fmt.Println(resp.Header)
+        //fmt.Printf("multi body :")
+        //fmt.Println(resp.Body)
         if resp.Close {
             continue
         }
@@ -243,6 +242,15 @@ func (file *File) RangeWrite (dest *os.File, start int64, end int64, chMulDow ch
     var flag = map[int] interface{}{}
     ioReader, err := file.ReqHttpRange(start, end - 1)
     reqRangeSize := end - start
+    file.WsRespData.PartNum = partNum
+    /*
+    splitTarget := file.WsRespData.Target
+    if len(splitTarget) == 2 {
+        file.WsRespData.Target = file.WeRespData.Target + "-" + strconv.Itoa(int(partNum))
+    } else {
+        file.WsRespData.Target = splitTarget[ + "-" + strconv.Itoa(int(partNum))
+    }
+    */
     if err != nil { return }
     buf := make([]byte, 32 * 1024)
     for {
@@ -264,8 +272,8 @@ func (file *File) RangeWrite (dest *os.File, start int64, end int64, chMulDow ch
             pp := int(p)
             if pp >= 25 && pp % 25 == 0 {
                 if flag[pp] != true {
-                    //file.WsRespData.Progress = pp
-                    //websocket.JSON.Send(file.Ws, file.WsRespData)
+                    file.WsRespData.Progress = pp
+                    websocket.JSON.Send(file.Ws, file.WsRespData)
                     fmt.Printf("%s part%d progress: %v%%\n", file.Name, partNum, int(p))
                 }
                 flag[pp] = true
@@ -308,8 +316,14 @@ func DownloadFile(url string, storagePath string, ws *websocket.Conn, rec *WsRes
     } else {
         if ! file.FileHasDownload() {
             if file.CheckHttpRange() {
-                fmt.Println("Support http range")
-                err = file.MultiDownload()
+                // If file is too small, use single download
+                if file.Size < MulDowAtLeastSize {
+                    fmt.Println("Support http range, but file size is too small, choose single download")
+                    err = file.SingleDownload()
+                } else {
+                    fmt.Println("Support http range")
+                    err = file.MultiDownload()
+                }
             } else {
                 fmt.Println("Not support http range")
                 err = file.SingleDownload()

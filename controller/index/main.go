@@ -88,17 +88,30 @@ func Home(w http.ResponseWriter, r *http.Request) {
         tmplPath + "header.tmpl",
         indexPath + "body.html",
         tmplPath + "index/urlItem.tmpl",
+        tmplPath + "index/multiProgress.tmpl",
         tmplPath + "footer.tmpl",
     )
 
     // For loop url item
-    var tmplBuf bytes.Buffer
-    var nums = map[string] interface{}{}
-    for num := 1; num <= 10; num++ {
-        nums["num"] = num
-        t.ExecuteTemplate(&tmplBuf, "urlItem", nums)
+    var urlBuf bytes.Buffer
+    var progressBuf bytes.Buffer
+    var urlItemNums = map[string] interface{}{}
+    var progressNums = map[string] interface{}{}
+    var progressBarStatus = []string {1: "progress-bar", 2: "progress-bar-warning", 3: "progress-bar-info", 4: "progress-bar-success", 5: "progress-bar-danger"}
+    for urlItemNum := 1; urlItemNum <= 10; urlItemNum++ {
+        urlItemNums["num"] = urlItemNum
+        // For loop multi progress
+        for progressNum := 1; progressNum <= int(download.MultiSectionDowCount); progressNum++ {
+            progressNums["num"] = urlItemNum
+            progressNums["partNum"] = progressNum
+            progressNums["progressBarStatus"] = progressBarStatus[progressNum]
+            t.ExecuteTemplate(&progressBuf, "multiProgress", progressNums)
+        }
+        urlItemNums["multiProgress"] = template.HTML(progressBuf.String())
+        t.ExecuteTemplate(&urlBuf, "urlItem", urlItemNums)
+        progressBuf.Truncate(0)
     }
-    data["urlItem"] = template.HTML(tmplBuf.String())
+    data["urlItem"] = template.HTML(urlBuf.String())
 
     t.ExecuteTemplate(w, "body", data)
 	t.Execute(w, nil)
