@@ -71,7 +71,11 @@ func Home(w http.ResponseWriter, r *http.Request) {
             data["storagePath"] = currentPath
             // ffplay path
             ffplayPath := currentPath + string(os.PathSeparator) + "ffplay.exe"
-            data["checkFFmpegPath"] = true
+            if osmod.FileExists(ffplayPath) {
+                data["checkFFmpegPath"] = true
+            } else {
+                data["checkFFmpegPath"] = false
+            }
             data["ffmpegPath"] = ffplayPath
         }
     }

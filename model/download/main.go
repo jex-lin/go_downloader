@@ -15,7 +15,7 @@ import (
 )
 
 const (
-    MulDowAtLeastSize = 3 * 1024 * 1024
+    MulDowAtLeastSize = 100 * 1024 * 1024
     MulSectionDowCount = int64(5)    // max = 5
 )
 
