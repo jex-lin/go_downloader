@@ -15,18 +15,19 @@ import (
 )
 
 const (
-    MulDowAtLeastSize = 100 * 1024 * 1024
+    MulDowAtLeastSize = 30 * 1024 * 1024
     MulSectionDowCount = int64(5)    // max = 5
 )
 
 type WsRespData struct {
-    Target string
+    Target string           // #url-1
     Url string
-    Progress int
-    Status string
+    Progress int            // 22  (%)
+    Status string           // ok  fail
     SingleOrMulti string
-    Msg string
-    FilePath string
+    PartNum int             // multi part num.    #url-1-4
+    Msg string              // message
+    FilePath string         // /tmp/video.flv
 }
 
 type File struct {
@@ -188,7 +189,6 @@ func (file *File) MultiDownload() (err error) {
     ReqRangeSize := int64(file.Size / MulSectionDowCount)
 
     startTime := time.Now()
-    wsUrlTarget := file.WsRespData.Target
     for partNum := int64(1); partNum <= MulSectionDowCount; partNum++ {
         if partNum == MulSectionDowCount {
             end = file.Size
@@ -196,17 +196,15 @@ func (file *File) MultiDownload() (err error) {
             end = start + ReqRangeSize
         }
         //fmt.Println(fmt.Sprintf("%d  ->  %d", start, end-1))
-        go file.RangeWrite(dest, start, end, chMulDow, partNum, wsUrlTarget)
+        go file.RangeWrite(dest, start, end, chMulDow, partNum)
         start = end
     }
     for i := int64(1); i <= MulSectionDowCount; i++ {
         written := <-chMulDow
         if written == -1 {
-            file.WsRespData.Target = wsUrlTarget
             return errors.New("Multi downloading - range write error")
         }
     }
-    file.WsRespData.Target = wsUrlTarget
     endTime := time.Now()
     durTime := endTime.Sub(startTime)
 	file.SpendTime = durTime.String()
@@ -239,14 +237,13 @@ func (file *File) ReqHttpRange (start int64, end int64) (respBody io.Reader,err 
     return
 }
 
-func (file *File) RangeWrite (dest *os.File, start int64, end int64, chMulDow chan int64, partNum int64, wsUrlTarget string) {
+func (file *File) RangeWrite (dest *os.File, start int64, end int64, chMulDow chan int64, partNum int64) {
     var written int64
     var p float32
     var flag = map[int] interface{}{}
     ioReader, err := file.ReqHttpRange(start, end - 1)
     reqRangeSize := end - start
     file.WsRespData.Status = "keep"
-    wsUrlTarget = wsUrlTarget + "-" + strconv.Itoa(int(partNum))
     if err != nil { return }
     buf := make([]byte, 32 * 1024)
     for {
@@ -266,10 +263,10 @@ func (file *File) RangeWrite (dest *os.File, start int64, end int64, chMulDow ch
 
 			p = float32(written) / float32(reqRangeSize) * 100
             pp := int(p)
-            if pp >= 25 && pp % 25 == 0 {
+            if pp >= 20 && pp % 20 == 0 {
                 if flag[pp] != true {
                     file.WsRespData.Progress = pp / int(MulSectionDowCount)
-                    file.WsRespData.Target = wsUrlTarget
+                    file.WsRespData.PartNum = int(partNum)
                     websocket.JSON.Send(file.Ws, file.WsRespData)
                     fmt.Printf("%s part%d progress: %v%%\n", file.Name, partNum, int(p))
                 }

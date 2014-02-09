@@ -82,7 +82,14 @@ function connect_websocket(ws) {
 
     // Sending from server
     ws.onmessage = function(e) {
+        var target
         var res = JSON.parse(e.data);
+        if (res["PartNum"] == 0) {  // single download
+            target = res["Target"];
+        } else {                    // multi download
+            target = res["Target"] + "-" + res["PartNum"];
+        }
+        console.log(target + " -> " + res["Progress"]);
         if (res["Status"] == "ok") {
             setTimeout(function(){
                 $(res["Target"] + "-download-container").addClass("hide");
@@ -91,7 +98,7 @@ function connect_websocket(ws) {
                 $(res["Target"] + "-status-fail").addClass("hide");
                 $(res["Target"] + "-wait-container").addClass("hide");
                 $(res["Target"] + "-play-container").removeClass("hide");
-                $(res["Target"] + "").attr("disabled", "disabled");
+                $(res["Target"]).attr("disabled", "disabled");
                 set_list_item_success($(res["Target"] + "-list-group-item"));
                 if ($(res["Target"] + "-play-container").data("filepath") != "undefined") {
                     $(res["Target"] + "-play-container").attr("data-filepath", res["FilePath"]);
@@ -103,7 +110,7 @@ function connect_websocket(ws) {
                 $(res["Target"] + "-play-container").attr("data-filepath", res["FilePath"]);
                 $(res["Target"] + "-play-container").removeClass("hide");
             }
-            $(res["Target"] + "-" + res["SingleOrMulti"] + "-progress-bar").css("width", res["Progress"]+"%");
+            $(target + "-" + res["SingleOrMulti"] + "-progress-bar").css("width", res["Progress"]+"%");
         } else if (res["Status"] == "fail") {
             $(res["Target"] + "-play-container").addClass("hide");
             $(res["Target"] + "-wait-container").addClass("hide");
