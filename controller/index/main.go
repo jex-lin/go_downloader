@@ -23,7 +23,6 @@ func Static(w http.ResponseWriter, r *http.Request) {
 }
 
 func Home(w http.ResponseWriter, r *http.Request) {
-
     var data = map[string] interface{}{}
 
     // Receive post
@@ -101,7 +100,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
     for urlItemNum := 1; urlItemNum <= 10; urlItemNum++ {
         urlItemNums["num"] = urlItemNum
         // For loop multi progress
-        for progressNum := 1; progressNum <= int(download.MultiSectionDowCount); progressNum++ {
+        for progressNum := 1; progressNum <= int(download.MulSectionDowCount); progressNum++ {
             progressNums["num"] = urlItemNum
             progressNums["partNum"] = progressNum
             progressNums["progressBarStatus"] = progressBarStatus[progressNum]

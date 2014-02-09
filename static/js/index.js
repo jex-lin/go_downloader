@@ -40,20 +40,16 @@ $(document).ready(function(){
         }
         $(this).addClass("hide");
         $("#url-" + num + "-wait-container").removeClass("hide");
-        $("#url-" + num + "-single-progress-container").removeClass("hide");
         set_list_item_warning($("#url-" + num + "-list-group-item"))
 
         // 0->connecting  1->open 2->closing 3->closed
-        console.log("0" + ws[num].readyState);
         setTimeout(function(){
             if (ws[num].readyState === 1) {
-                console.log("1" + ws[num].readyState);
                 ws[num].send(JSON.stringify(data))
             } else {
                 alert("Can't connect.");
             }
         }, 300);
-        console.log("2" + ws[num].readyState);
     })
 })
 
@@ -100,6 +96,7 @@ function connect_websocket(ws) {
                 if ($(res["Target"] + "-play-container").data("filepath") != "undefined") {
                     $(res["Target"] + "-play-container").attr("data-filepath", res["FilePath"]);
                 }
+                console.log(res["Msg"])
             }, 1000);
         } else if (res["Status"] == "keep") {
             if ($(res["Target"] + "-play-container").hasClass("hide")) {
@@ -115,6 +112,9 @@ function connect_websocket(ws) {
             $(res["Target"] + "-status-ok").addClass("hide");
             $(res["Target"] + "-status-fail").removeClass("hide");
             set_list_item_error($(res["Target"] + "-list-group-item"));
+            console.log(res["Msg"])
+        } else if (res["Status"] == "UpdateUI") {
+            $(res["Target"] + "-" + res["SingleOrMulti"] + "-progress-container").removeClass("hide");
         }
     }
 
