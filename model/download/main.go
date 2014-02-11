@@ -226,11 +226,10 @@ func (file *File) ReqHttpRange (start int64, end int64) (respBody io.Reader,err 
         if resp.Close {
             continue
         }
-        if resp.Header.Get("Accept-Ranges") == "bytes" {
-            fmt.Println("multi support range")
+        if resp.StatusCode == 206 {
+            fmt.Println("Support http range")
         } else {
-            fmt.Println("multi not support range")
-            //return nil, errors.New("multi not support range")
+            return nil, errors.New("Not support http range")
         }
         return resp.Body, nil
     }
