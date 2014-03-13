@@ -1,29 +1,22 @@
 package index
 
-import (
+import(
     "html/template"
     "net/http"
     "strings"
     "path/filepath"
     "go_downloader/model/osmod"
     "go_downloader/model/download"
-    "code.google.com/p/go.net/websocket"
     "fmt"
     "os"
     "strconv"
-    "os/exec"
     "runtime"
-    "encoding/json"
     "bytes"
 )
 
-// Static file (img, js, css)
-func Static(w http.ResponseWriter, r *http.Request) {
-    http.ServeFile(w, r, r.URL.Path[1:])
-}
-
-func Home(w http.ResponseWriter, r *http.Request) {
+func Thisav(w http.ResponseWriter, r *http.Request) {
     var data = map[string] interface{}{}
+    data["evil"] = true
 
     // Receive post
     r.ParseForm()
@@ -84,6 +77,8 @@ func Home(w http.ResponseWriter, r *http.Request) {
         data["isWindows"] = true
     }
 
+    // parse thisav
+
     // Show view
     var tmplPath string = "view/template/"
     var indexPath string = "view/index/"
@@ -120,84 +115,3 @@ func Home(w http.ResponseWriter, r *http.Request) {
     t.Execute(w, nil)
 }
 
-func Download(ws *websocket.Conn) {
-
-    var err error
-    var rec download.WsRespData
-    var file download.File
-    ch := make(chan int)
-
-    // Full CPU Running
-    runtime.GOMAXPROCS(runtime.NumCPU())
-
-    for {
-        err = websocket.JSON.Receive(ws, &rec)
-        if err != nil {
-            var reply download.WsRespData
-            reply.Status = "fail"
-            reply.Msg = "Not JSON format"
-            websocket.JSON.Send(ws, reply)
-            break
-        }
-
-        storagePath, err2 := osmod.GetStoragePath()
-        if err2 != nil {
-            rec.Status = "fail"
-            rec.Msg = "Storage path doesn't exist."
-            websocket.JSON.Send(ws, rec)
-            break
-        }
-
-        go download.DownloadFile(rec.Url, storagePath, ws, &rec, ch);
-        errNum := <-ch
-        if  errNum == 0 {
-            rec.Status = "fail"
-            os.Remove(file.Path)
-        } else {
-            // Success
-            rec.Status = "ok"
-        }
-        fmt.Println(rec.Msg)
-
-        if err = websocket.JSON.Send(ws, rec); err == nil {
-            // If success then close connection.
-            if errNum == 1 {
-                fmt.Println("Close websocket connection.")
-                ws.Close()
-            }
-        } else {
-            fmt.Println("Can't send")
-            break
-        }
-    }
-}
-
-func PlayVideo(w http.ResponseWriter, r *http.Request) {
-    output := map[string] interface{} {}
-
-    // Receive post
-    r.ParseForm()
-    if r.Method == "POST" {
-        ffmpegPath := filepath.Clean(strings.TrimSpace(r.FormValue("FFmpegPath")))
-        filePath := filepath.Clean(strings.TrimSpace(r.FormValue("FilePath")))
-
-        if ! osmod.FileExists(ffmpegPath) || ! osmod.FileExists(filePath) {
-            output["Status"] = "fail"
-            output["ErrMsg"] = "FFmpeg path or file path doesn't exist."
-            outputJSON, _ := json.Marshal(output)
-            fmt.Fprintf(w, string(outputJSON))
-            return
-        }
-
-        cmd := exec.Command(ffmpegPath, filePath)
-        err := cmd.Run()
-        if err == nil {
-            output["Status"] = "ok"
-        } else {
-            output["Status"] = "fail"
-            output["ErrMsg"] = err.Error()
-        }
-        outputJSON, _ := json.Marshal(output);
-        fmt.Fprintf(w, string(outputJSON))
-    }
-}

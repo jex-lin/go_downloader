@@ -2,18 +2,19 @@ package main
 
 import (
     "code.google.com/p/go.net/websocket"
-	"go_downloader/controller/index"
-	"net/http"
-	"log"
+    "go_downloader/controller/index"
+    "net/http"
+    "log"
 )
 
 func main() {
-	http.HandleFunc("/", index.Home)
+    http.HandleFunc("/", index.Home)
     http.Handle("/download/", websocket.Handler(index.Download))
     http.HandleFunc("/playVideo/", index.PlayVideo)
-	http.HandleFunc("/static/", index.Static)
-	err := http.ListenAndServe(":9090", nil)
-	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
-	}
+    http.HandleFunc("/static/", index.Static)
+    http.HandleFunc("/thisav/", index.Thisav)
+    err := http.ListenAndServe(":9111", nil)
+    if err != nil {
+        log.Fatal("ListenAndServe: ", err)
+    }
 }
